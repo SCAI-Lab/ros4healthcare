@@ -1,0 +1,6 @@
+polar_connector:
+  ros__parameters:
+    publish_acceleration: True
+    publish_hr: True
+    publish_ecg: False
+    bluetooth_adapter: "hci1"
