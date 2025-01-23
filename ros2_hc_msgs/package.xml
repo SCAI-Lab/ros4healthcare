@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="kupper.lucas@gmail.com">Lucas Kupper</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license> 
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -14,6 +14,7 @@
 
   <depend>builtin_interfaces</depend>
   <depend>std_msgs</depend>
+
   
   <build_depend>rosidl_default_generators</build_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>

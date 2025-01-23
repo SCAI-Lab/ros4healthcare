@@ -75,25 +75,21 @@ set(msg_files
 #)
 
 
-
+# Generate ROS interfaces
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
   ${msg_files}
-  #${srv_files}
-  DEPENDENCIES builtin_interfaces std_msgs
-  DEPENDENCIES builtin_interfaces geometry_msgs
- )
- 
+  DEPENDENCIES builtin_interfaces std_msgs geometry_msgs
+)
+
+# Enable testing
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
- 
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
- 
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# Install package metadata
 ament_package()
 
