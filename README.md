@@ -19,7 +19,7 @@ Welcome to the **ROS4 Healthcare** project! This repository contains ROS2 packag
 
 
 ```
-ros2-healthcare
+ros4-healthcare
 ├── ros2_hc_drv
 │   ├── mbient_ros
 │   │   ├── CMakeLists.txt
@@ -96,7 +96,7 @@ We then need to clone the repositories into our workspace
 
 ```
 cd ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros2_healthcare.git
+git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
 cd ..
 ```
 then build and source the workspace 
@@ -151,7 +151,7 @@ We then need to clone the repositories into our workspace
 
 ```
 cd ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros2_healthcare.git
+git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
 cd ..
 ```
 then build and source the workspace 
