@@ -14,7 +14,6 @@ class SensomativeDriver(Node):
         ## logger init
         self.logger_ = self.get_logger()
         self.logger_.info('Publishing sensomative data')
-
         self.get_logger().info('Attempting to connect to device: "%s"' % self.address)
 
         ## try connection with the devices
@@ -28,8 +27,8 @@ class SensomativeDriver(Node):
         if adapter is None:
             adapter = all_adapters[0]
 
-        self.logger_.info('Scanning for 6 seconds...')
-        adapter.scan_for(6000)  # Increase the scan time to 4 seconds
+        self.logger_.info('Scanning for 10 seconds...')
+        adapter.scan_for(10000)  
         peripherals = adapter.scan_get_results()
         self.logger_.info('Found %d peripherals' % len(peripherals))
         self.peripherals = {x.address():x for x in peripherals}

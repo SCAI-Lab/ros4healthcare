@@ -12,6 +12,14 @@
   
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>cv_bridge</depend>
+  <depend>ros2_hc_msgs</depend>
+
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-plotly</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -19,11 +27,6 @@
   <test_depend>python3-pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  
-  <!-- <exec_depend>rclpy</exec_depend> -->
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-
 
   <export>
     <build_type>ament_cmake</build_type>

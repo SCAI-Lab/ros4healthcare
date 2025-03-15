@@ -12,12 +12,30 @@ def generate_launch_description():
         'params.yaml'
         )
 
-    sensomative_node=Node(
-        package = 'sensomative_ros',
-        name = 'sensomative_ros',
-        executable = 'sensomative_wrapper.py',
-        parameters = [config]
+    sensomative_node = Node(
+        package='sensomative_ros',
+        name='sensomative_ros',
+        executable='sensomative_wrapper.py',
+        parameters=[config],
+        output='screen'
     )
+    
+    visualiser_node = Node(
+        package='sensomative_ros',
+        name='pressure_visualizer',
+        executable='pressure_visualizer.py',
+        parameters=[{
+            'input_topic': '/pressure1',
+            'output_topic': '/pressure_visualizer',
+            'array_width': 50,
+            'array_height': 50,
+            'smoothing_sigma': 3.0,
+            'debug_mode': False
+        }],
+        output='screen'
+    )
+    
     ld.add_action(sensomative_node)
-
+    ld.add_action(visualiser_node)
+    
     return ld

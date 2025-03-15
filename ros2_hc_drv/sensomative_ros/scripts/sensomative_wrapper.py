@@ -4,7 +4,9 @@ from sensomative_ros.sensomative import SensomativeDriver
 import rclpy
 import rclpy.logging
 from rclpy.node import Node
-from ros_healthcare_msg.msg import Pressure, PressureHeader
+from ros2_hc_msgs.msg._pressure import Pressure
+from ros2_hc_msgs.msg._pressure_header import PressureHeader
+
 from std_msgs.msg import Header
 
 
@@ -12,19 +14,31 @@ class SensomativeWrapper(Node):
     def __init__(self):
         super().__init__('sensomative_wrapper')
 
-        self.declare_parameter('mac_add', "CC:CC:CC:0A:39:C7") 
+        # Declare parameters with proper types
+        self.declare_parameter('mac_add', "CC:CC:CC:0A:39:73")
+        self.declare_parameter('hci_mac', "")  
+
+        # Get parameter values
         self.address = self.get_parameter('mac_add').get_parameter_value().string_value
-        self.declare_parameter('hci_mac', None) 
         self.hci_mac = self.get_parameter('hci_mac').get_parameter_value().string_value
-        self.driver = SensomativeDriver(self.address, hci_mac=self.hci_mac)
+        
+        # Only pass hci_mac if it's not empty
+        if self.hci_mac:
+            self.driver = SensomativeDriver(self.address, hci_mac=self.hci_mac)
+        else:
+            self.driver = SensomativeDriver(self.address)
+
         self.publisher_ = self.create_publisher(Pressure, 'pressure1', 10)
         self.device_exists = self.driver.get_device_exists()
         self.logger_ = self.get_logger()
         
+        # Add some logging to help debug
+        self.logger_.info(f"Attempting to connect to device: \"{self.address}\"")
+        if self.hci_mac:
+            self.logger_.info(f"Using HCI MAC: \"{self.hci_mac}\"")
         
-        timer_period = 0.1 # 1 - Frequency of the sampling
+        timer_period = 0.1  # 1 - Frequency of the sampling
         self.timer = self.create_timer(timer_period, self.timer_callback)
-
 
     def timer_callback(self):
         msg = Pressure()
