@@ -95,7 +95,7 @@ ros4-healthcare
 We then need to clone the repositories into our workspace
 
 ```
-cd ros4_ws/src
+cd ros2_ws/src
 git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
 cd ..
 ```
