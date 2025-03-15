@@ -94,17 +94,18 @@ ros4-healthcare
 
 We then need to clone the repositories into our workspace
 
-```
-cd ros2_ws/src
+```bash
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
 git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
-cd ..
+cd ~/ros2_ws
 ```
-then build and source the workspace 
-
-```
-colcon build --symlink-install
+### **Build `ros2_hc_msgs`**
+```bash
+colcon build --packages-select ros2_hc_msgs --symlink-install
 source install/setup.bash
 ```
+
 
 ## Running the Wrappers
 
