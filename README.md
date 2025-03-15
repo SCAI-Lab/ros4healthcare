@@ -90,14 +90,21 @@ ros4-healthcare
 ```
 ## Setup
 
+## **Prerequisites**
+- Ensure **ROS 2 Humble** installed.
+
+- Source ROS 2 :
+  ```bash
+  source /opt/ros/humble/setup.bash
+  ```
 
 
-We then need to clone the repositories into our workspace
+Now clone the repo into our workspace
 
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
+git clone --recurse-submodules git@github.com:SCAI-Lab/ros4healthcare.git
 cd ~/ros2_ws
 ```
 ### **Build `ros2_hc_msgs`**
@@ -150,9 +157,9 @@ simply run ```pip install -r requirements.txt``` to install the dependencies
 
 We then need to clone the repositories into our workspace
 
-```
+```bash
 cd ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros4_healthcare.git
+git clone --recurse-submodules git@github.com:SCAI-Lab/ros4healthcare.git
 cd ..
 ```
 then build and source the workspace 

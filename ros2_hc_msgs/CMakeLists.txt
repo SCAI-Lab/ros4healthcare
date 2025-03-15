@@ -90,6 +90,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+set(LD_LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
+
 # Install package metadata
 ament_package()
 
