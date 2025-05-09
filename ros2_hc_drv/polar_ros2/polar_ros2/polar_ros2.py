@@ -39,6 +39,7 @@ class PolarConnector(Node):
   
     async def get_device(self):
         devices = await BleakScanner.discover()
+        polar_device = None 
         polar_device_found = False
         acc_data = None
         ibi_data = None    
@@ -46,9 +47,12 @@ class PolarConnector(Node):
             if device.name is not None and "Polar" in device.name:
                 polar_device_found = True
                 polar_device = PolarH10(self, device, self.bluetooth_adapter, self.publish_acceleration, self.publish_hr, self.publish_ecg)
+                break
         
         if not polar_device_found:
             print("No Polar device found")
+            self.get_logger().error("No Polar device found")
+            
         return polar_device
 
     async def run(self, polar_device):
