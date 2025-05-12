@@ -3,7 +3,7 @@ name: PR Workflow
 on:
   pull_request:
     branches:
-      - main
+      - '**'
 
 jobs:
   call-reusable-workflow:
