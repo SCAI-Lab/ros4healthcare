@@ -1,0 +1,3 @@
+jobs:
+  call-workflow-passing-data:
+    uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main

@@ -1,0 +1,12 @@
+[Unit]
+Description=mbient driver
+After=network.target
+
+[Service]
+User=scai
+Environment=/home/scai/ros4hc.env
+ExecStart=/bin/bash -c 'source /opt/ros/current/setup.bash && source install/setup.bash && ros2 launch mbient_ros mbient_node.launch.py'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

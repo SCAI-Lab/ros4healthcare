@@ -42,6 +42,16 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  FILES hc-mbient-driver.service
+  DESTINATION /usr/lib/systemd/system
+)
+
+# Enabling the service to run automatically after reboot
+execute_process(
+  COMMAND systemctl hc-mbient-driver.service
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

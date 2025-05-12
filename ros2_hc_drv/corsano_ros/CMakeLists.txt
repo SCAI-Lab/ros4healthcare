@@ -37,6 +37,16 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  FILES hc-corsano-driver.service
+  DESTINATION /usr/lib/systemd/system
+)
+
+# Enabling the service to run automatically after reboot
+execute_process(
+  COMMAND systemctl hc-corsano-driver.service
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
