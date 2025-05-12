@@ -1,3 +1,12 @@
+name: PR Workflow
+
+on:
+  pull_request:
+    branches:
+      - main
+
 jobs:
-  call-workflow-passing-data:
+  call-reusable-workflow:
     uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main
+    with:
+      run_target: "pull_request"
