@@ -3,12 +3,13 @@
 <package format="3">
   <name>ros4hc_full</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="moperez@ethz.ch">monch</maintainer>
+  <description>Metapackage and configs for ROS4HC Demo</description>
+  <maintainer email="moperez@ethz.ch">Monica Perez Serrano</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend></depend>
+  <depend>polar_ros2</depend>
+  <depend>sensomative_ros</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
