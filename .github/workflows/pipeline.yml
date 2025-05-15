@@ -47,7 +47,7 @@ jobs:
               source /opt/ros/humble/setup.bash && \
               rosdep init || true && \
               rosdep update && \
-              rosdep install --from-paths . --ignore-src -r -y && \
+              rosdep install --from-paths . --ignore-src -r --custom-repos-file rosdep_override.yaml -y && \
               for pkg in \$(colcon list --paths-only); do
                 echo 'Generating debian metadata for' \$pkg && \
                 cd \$pkg && \
