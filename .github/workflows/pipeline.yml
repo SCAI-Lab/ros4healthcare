@@ -55,6 +55,7 @@ jobs:
               rosdep init || true && \
               rosdep update && \
               rosdep install --from-paths . --ignore-src -r -y && \
+              colcon build --symlink-install && \
               for pkg in \$(colcon list --paths-only); do
                 echo 'Generating debian metadata for' \$pkg && \
                 cd \$pkg && \
