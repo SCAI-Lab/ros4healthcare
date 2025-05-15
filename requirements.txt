@@ -57,6 +57,6 @@ typing-extensions==4.5.0
 urllib3==1.26.16
 warble==1.2.9
 watchdog==3.0.0
-Werkzeug==2.3.6
+Werkzeug==3.0.6
 wrapt==1.15.0
 zipp==3.16.2
