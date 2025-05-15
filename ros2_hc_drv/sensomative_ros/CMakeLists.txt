@@ -50,13 +50,13 @@ install(DIRECTORY
 )
 
 install(
-  FILES hc-corsano-driver.service
+  FILES hc-sensomative-driver.service
   DESTINATION /usr/lib/systemd/system
 )
 
 # Enabling the service to run automatically after reboot
 execute_process(
-  COMMAND systemctl hc-corsano-driver.service
+  COMMAND systemctl enable hc-sensomative-driver.service
 )
 
 if(BUILD_TESTING)

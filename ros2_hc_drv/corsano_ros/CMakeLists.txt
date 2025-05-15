@@ -44,7 +44,7 @@ install(
 
 # Enabling the service to run automatically after reboot
 execute_process(
-  COMMAND systemctl hc-corsano-driver.service
+  COMMAND systemctl enable hc-corsano-driver.service
 )
 
 if(BUILD_TESTING)

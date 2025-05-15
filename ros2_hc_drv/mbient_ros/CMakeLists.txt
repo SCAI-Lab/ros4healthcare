@@ -49,7 +49,7 @@ install(
 
 # Enabling the service to run automatically after reboot
 execute_process(
-  COMMAND systemctl hc-mbient-driver.service
+  COMMAND systemctl enable hc-mbient-driver.service
 )
 
 if(BUILD_TESTING)
