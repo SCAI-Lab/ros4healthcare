@@ -1,4 +1,17 @@
-name: PR Workflow
+# name: PR Workflow
+
+# on:
+#   pull_request:
+#     branches:
+#       - '**'
+
+# jobs:
+#   call-reusable-workflow:
+#     uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main
+#     with:
+#       run_target: "pull_request"
+
+name: Create Debians (ARM64) for all packages
 
 on:
   pull_request:
@@ -6,7 +19,53 @@ on:
       - '**'
 
 jobs:
-  call-reusable-workflow:
-    uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main
-    with:
-      run_target: "pull_request"
+  build-arm64:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run ARM64 Docker container to build packages
+        run: |
+          docker run --rm --privileged --platform linux/arm64 \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            arm64v8/ros:humble-ros-base bash -c "
+              apt update && \
+              apt install -y git python3-colcon-common-extensions python3-rosdep \
+                             dpkg-dev fakeroot devscripts build-essential \
+                             python3-bloom && \
+              source /opt/ros/humble/setup.bash && \
+              rosdep init || true && \
+              rosdep update && \
+              rosdep install --from-paths . --ignore-src -r -y && \
+              for pkg in \$(colcon list --paths-only); do
+                echo 'Generating debian metadata for' \$pkg && \
+                cd \$pkg && \
+                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
+                cd -; \
+              done && \
+              mkdir -p debs && \
+              for pkg in \$(colcon list --paths-only); do
+                echo 'Building debian package for' \$pkg && \
+                cd \$pkg && \
+                fakeroot debian/rules binary && \
+                cd ../..; \
+              done && \
+              find . -name '*.deb' -exec mv {} debs/ \;
+            "
+
+      - name: Upload .deb files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros-debian-packages
+          path: debs/*.deb
