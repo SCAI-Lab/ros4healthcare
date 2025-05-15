@@ -45,9 +45,11 @@ jobs:
                              dpkg-dev fakeroot devscripts build-essential \
                              python3-bloom python3-ament-package && \
               source /opt/ros/humble/setup.bash && \
+              mkdir -p /etc/ros/rosdep/sources.list.d && \
+              echo "yaml file://rosdep_override.yaml" > /etc/ros/rosdep/sources.list.d/50-local.list && \
               rosdep init || true && \
               rosdep update && \
-              rosdep install --from-paths . --ignore-src -r --custom-repos-file rosdep_override.yaml -y && \
+              rosdep install --from-paths . --ignore-src -r -y && \
               for pkg in \$(colcon list --paths-only); do
                 echo 'Generating debian metadata for' \$pkg && \
                 cd \$pkg && \
