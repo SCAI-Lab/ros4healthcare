@@ -36,40 +36,40 @@ jobs:
 
       - name: Run ARM64 Docker container to build packages
         run: |
+          # Ensure rosdep_override.yaml exists and is accessible
+          if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
+            echo "Warning: rosdep_override.yaml not found!"
+          fi
+
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             arm64v8/ros:humble-ros-base bash -c "
-              set -euo pipefail
-
               apt update && \
               apt install -y git python3-colcon-common-extensions python3-rosdep \
                              dpkg-dev fakeroot devscripts build-essential \
-                             python3-bloom python3-ament-package \
-                             curl gnupg lsb-release && \
+                             python3-bloom python3-ament-package && \
               source /opt/ros/humble/setup.bash && \
               mkdir -p /etc/ros/rosdep/sources.list.d && \
-              if [ -f /workspace/rosdep_override.yaml ]; then \
-                echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list; \
-              fi && \
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
               rosdep init || true && \
               rosdep update && \
               rosdep install --from-paths . --ignore-src -r -y && \
-              mkdir -p /workspace/debs && \
               for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Generating Debian metadata for' \$pkg && \
+                echo 'Generating debian metadata for' \$pkg && \
                 pushd \$pkg > /dev/null && \
                 rm -rf debian && \
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
                 popd > /dev/null; \
               done && \
+              mkdir -p debs && \
               for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Building Debian package for' \$pkg && \
+                echo 'Building debian package for' \$pkg && \
                 pushd \$pkg > /dev/null && \
                 fakeroot debian/rules binary && \
                 popd > /dev/null; \
               done && \
-              find . -name '*.deb' -exec mv {} /workspace/debs/ \;
+              find . -name '*.deb' -exec mv {} debs/ \;
             "
 
       - name: Upload .deb files as artifacts
