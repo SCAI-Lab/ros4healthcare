@@ -36,6 +36,11 @@ jobs:
 
       - name: Run ARM64 Docker container to build packages
         run: |
+          # Ensure rosdep_override.yaml exists and is accessible
+          if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
+            echo "Warning: rosdep_override.yaml not found!"
+          fi
+
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
@@ -46,7 +51,7 @@ jobs:
                              python3-bloom python3-ament-package && \
               source /opt/ros/humble/setup.bash && \
               mkdir -p /etc/ros/rosdep/sources.list.d && \
-              echo 'yaml file://$(pwd)/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
               rosdep init || true && \
               rosdep update && \
               rosdep install --from-paths . --ignore-src -r -y && \
