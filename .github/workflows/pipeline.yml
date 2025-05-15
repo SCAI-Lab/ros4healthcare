@@ -55,15 +55,14 @@ jobs:
               rosdep init || true && \
               rosdep update && \
               rosdep install --from-paths . --ignore-src -r -y && \
-              colcon build --symlink-install && \
-              for pkg in \$(colcon list --paths-only); do
+              for pkg in \$(colcon list --paths-only --topological-order); do
                 echo 'Generating debian metadata for' \$pkg && \
                 cd \$pkg && \
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
                 cd -; \
               done && \
               mkdir -p debs && \
-              for pkg in \$(colcon list --paths-only); do
+              for pkg in \$(colcon list --paths-only --topological-order); do
                 echo 'Building debian package for' \$pkg && \
                 cd \$pkg && \
                 fakeroot debian/rules binary && \
