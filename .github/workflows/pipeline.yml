@@ -57,17 +57,16 @@ jobs:
               rosdep install --from-paths . --ignore-src -r -y && \
               for pkg in \$(colcon list --paths-only --topological-order); do
                 echo 'Generating debian metadata for' \$pkg && \
-                pushd \$pkg > /dev/null && \
-                rm -rf debian && \
-                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
-                popd > /dev/null; \
+                cd \$pkg && \
+                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy --rosdistro-path ./rosdistro && \
+                cd -; \
               done && \
               mkdir -p debs && \
               for pkg in \$(colcon list --paths-only --topological-order); do
                 echo 'Building debian package for' \$pkg && \
-                pushd \$pkg > /dev/null && \
+                cd \$pkg && \
                 fakeroot debian/rules binary && \
-                popd > /dev/null; \
+                cd ../..; \
               done && \
               find . -name '*.deb' -exec mv {} debs/ \;
             "
