@@ -76,6 +76,7 @@ jobs:
 
                 # Install built packages for dependency resolution
                 dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+                source /opt/ros/humble/setup.bash
 
                 cd \$INITIAL_DIR
               done
