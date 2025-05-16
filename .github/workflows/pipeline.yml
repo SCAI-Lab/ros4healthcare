@@ -36,43 +36,55 @@ jobs:
 
       - name: Run ARM64 Docker container to build packages
         run: |
-          # Ensure rosdep_override.yaml exists and is accessible
-          if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
-            echo "Warning: rosdep_override.yaml not found!"
-          fi
-
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             arm64v8/ros:humble-ros-base bash -c "
+              set -e
+
+              # Environment setup
               apt update && \
               apt install -y git python3-colcon-common-extensions python3-rosdep \
                              dpkg-dev fakeroot devscripts build-essential \
                              python3-bloom python3-ament-package && \
-              source /opt/ros/humble/setup.bash && \
+              source /opt/ros/humble/setup.bash
+
+              # rosdep setup
               mkdir -p /etc/ros/rosdep/sources.list.d && \
-              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list || true && \
               rosdep init || true && \
               rosdep update && \
-              rosdep install --from-paths . --ignore-src -r -y && \
+              rosdep install --from-paths . --ignore-src -r -y
+
+              # Create output dir for .deb files
+              mkdir -p /workspace/debs
+
+              # Generate and build packages
               for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Generating debian metadata for' \$pkg && \
-                cd \$pkg && \
-                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy --rosdistro-path ./rosdistro && \
-                cd -; \
-              done && \
-              mkdir -p debs && \
-              for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Building debian package for' \$pkg && \
-                cd \$pkg && \
-                fakeroot debian/rules binary && \
-                cd ../..; \
-              done && \
-              find . -name '*.deb' -exec mv {} debs/ \;
+                echo 'Processing package: '\$pkg
+                cd \$pkg
+
+                echo 'Generating debian metadata...'
+                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
+
+                echo 'Building Debian package...'
+                export DEB_BUILD_OPTIONS=parallel=\$(nproc)
+                fakeroot debian/rules binary
+
+                echo 'Moving .deb files...'
+                find .. -maxdepth 1 -name '*.deb' -exec mv {} /workspace/debs/ \;
+
+                echo 'Installing .deb to satisfy dependencies for next packages...'
+                dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+
+                cd /workspace
+              done
+
+              echo 'All packages built and installed.'
             "
 
       - name: Upload .deb files as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ros-debian-packages
-          path: debs/*.deb
+          path: ./debs/*.deb
