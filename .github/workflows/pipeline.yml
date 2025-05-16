@@ -34,38 +34,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Ensure debs directory exists
-        run: mkdir -p debs
-
       - name: Run ARM64 Docker container to build packages
         run: |
+          # Ensure rosdep_override.yaml exists and is accessible
           if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
-            echo "Warning: rosdep_override.yaml not found!"
+            echo "Error: rosdep_override.yaml not found!" && exit 1
           fi
 
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             arm64v8/ros:humble-ros-base bash -c "
-              set -eux
-
               apt update && \
-              apt install -y \
-                git python3-colcon-common-extensions python3-rosdep \
-                dpkg-dev fakeroot devscripts build-essential \
-                python3-bloom python3-ament-package lsb-release && \
-
+              apt install -y git python3-colcon-common-extensions python3-rosdep \
+                             dpkg-dev fakeroot devscripts build-essential \
+                             python3-bloom python3-ament-package && \
               source /opt/ros/humble/setup.bash && \
-
               mkdir -p /etc/ros/rosdep/sources.list.d && \
-              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list || true
-
-              rosdep init || true
-              rosdep update || echo 'rosdep update failed, continuing anyway'
-
-              # Install external dependencies
-              rosdep install --from-paths . --ignore-src -r -y
-
+              # Use absolute path to rosdep_override.yaml inside the container
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              rosdep init || true && \
+              rosdep update && \
+              rosdep install --from-paths . --ignore-src -r -y && \
               mkdir -p /workspace/debs
               export INITIAL_DIR=\$(pwd)
 
