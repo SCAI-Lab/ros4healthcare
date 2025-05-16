@@ -48,6 +48,7 @@ jobs:
               apt update && \
               apt install -y git python3-colcon-common-extensions python3-rosdep \
                              dpkg-dev fakeroot devscripts build-essential \
+                             debhelper dh-python \
                              python3-bloom python3-ament-package && \
               source /opt/ros/humble/setup.bash && \
               mkdir -p /etc/ros/rosdep/sources.list.d && \
