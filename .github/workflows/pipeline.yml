@@ -47,38 +47,47 @@ jobs:
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             arm64v8/ros:humble-ros-base bash -c "
-              set -e
+              set -eux
+
               apt update && \
-              apt install -y git python3-colcon-common-extensions python3-rosdep \
-                             dpkg-dev fakeroot devscripts build-essential \
-                             python3-bloom python3-ament-package && \
+              apt install -y \
+                git python3-colcon-common-extensions python3-rosdep \
+                dpkg-dev fakeroot devscripts build-essential \
+                python3-bloom python3-ament-package lsb-release && \
 
               source /opt/ros/humble/setup.bash && \
 
               mkdir -p /etc/ros/rosdep/sources.list.d && \
-              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list || true
 
-              rosdep init || true && \
-              rosdep update || echo 'rosdep update failed, continuing anyway' && \
+              rosdep init || true
+              rosdep update || echo 'rosdep update failed, continuing anyway'
 
-              rosdep install --from-paths . --ignore-src -r -y && \
+              # Install external dependencies
+              rosdep install --from-paths . --ignore-src -r -y
 
-              mkdir -p /workspace/debs && \
-              INITIAL_DIR=\$(pwd)
+              mkdir -p /workspace/debs
+              export INITIAL_DIR=\$(pwd)
 
+              # Build each package in dependency order
               for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Generating debian metadata for' \$pkg && \
-                cd \$pkg && \
-                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
-                fakeroot debian/rules binary && \
+                echo 'Processing package:' \$pkg
+                cd \$pkg
+
+                # Generate Debian package metadata
+                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
+
+                # Build the Debian package
+                fakeroot debian/rules binary
+
+                # Move .debs to shared directory
+                find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
+
+                # Install built packages for dependency resolution
+                dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+
                 cd \$INITIAL_DIR
-              done && \
-
-              # Collect all generated .deb files
-              find . -name '*.deb' -exec mv {} /workspace/debs/ \;
-
-              # Optionally install built packages to verify
-              dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+              done
             "
 
       - name: Upload .deb files as artifacts
