@@ -34,9 +34,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Ensure debs directory exists
+        run: mkdir -p debs
+
       - name: Run ARM64 Docker container to build packages
         run: |
-          # Ensure rosdep_override.yaml exists and is accessible
           if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
             echo "Warning: rosdep_override.yaml not found!"
           fi
@@ -45,28 +47,38 @@ jobs:
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             arm64v8/ros:humble-ros-base bash -c "
+              set -e
               apt update && \
               apt install -y git python3-colcon-common-extensions python3-rosdep \
                              dpkg-dev fakeroot devscripts build-essential \
                              python3-bloom python3-ament-package && \
+
               source /opt/ros/humble/setup.bash && \
+
               mkdir -p /etc/ros/rosdep/sources.list.d && \
               echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+
               rosdep init || true && \
-              rosdep update && \
+              rosdep update || echo 'rosdep update failed, continuing anyway' && \
+
               rosdep install --from-paths . --ignore-src -r -y && \
+
+              mkdir -p /workspace/debs && \
+              INITIAL_DIR=\$(pwd)
+
               for pkg in \$(colcon list --paths-only --topological-order); do
                 echo 'Generating debian metadata for' \$pkg && \
                 cd \$pkg && \
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy && \
                 fakeroot debian/rules binary && \
-                cd ../.. && \
-                find $pkg -name '*.deb' -exec cp {} debs/ \; && \
-                dpkg -i debs/*.deb || apt-get install -f -y; \
-                cd -; \
+                cd \$INITIAL_DIR
               done && \
-              mkdir -p debs && \
-              find . -name '*.deb' -exec mv {} debs/ \;
+
+              # Collect all generated .deb files
+              find . -name '*.deb' -exec mv {} /workspace/debs/ \;
+
+              # Optionally install built packages to verify
+              dpkg -i /workspace/debs/*.deb || apt-get install -f -y
             "
 
       - name: Upload .deb files as artifacts
