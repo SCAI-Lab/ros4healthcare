@@ -17,19 +17,17 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-execute_process(
-    COMMAND ${Python3_EXECUTABLE} -m pip install --upgrade pip
-)
-execute_process(
-    COMMAND ${Python3_EXECUTABLE} -m pip install scipy plotly kaleido opencv-python
-)
+#execute_process(
+#    COMMAND ${Python3_EXECUTABLE} -m pip install --upgrade pip
+#)
+#execute_process(
+#    COMMAND ${Python3_EXECUTABLE} -m pip install scipy plotly kaleido opencv-python
+#)
 # Install Python modules
 ament_python_install_package(${PROJECT_NAME})
 
@@ -47,6 +45,16 @@ install(DIRECTORY
 install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  FILES hc-sensomative-driver.service
+  DESTINATION /usr/lib/systemd/system
+)
+
+# Enabling the service to run automatically after reboot
+execute_process(
+  COMMAND systemctl enable hc-sensomative-driver.service
 )
 
 if(BUILD_TESTING)

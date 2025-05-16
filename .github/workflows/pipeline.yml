@@ -1,0 +1,89 @@
+# name: PR Workflow
+
+# on:
+#   pull_request:
+#     branches:
+#       - '**'
+
+# jobs:
+#   call-reusable-workflow:
+#     uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main
+#     with:
+#       run_target: "pull_request"
+
+name: Create Debians (ARM64) for all packages
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run ARM64 Docker container to build packages
+        run: |
+          # Ensure rosdep_override.yaml exists and is accessible
+          if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
+            echo "Error: rosdep_override.yaml not found!" && exit 1
+          fi
+
+          docker run --rm --privileged --platform linux/arm64 \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            arm64v8/ros:humble-ros-base bash -c "
+              apt update && \
+              apt install -y git python3-colcon-common-extensions python3-rosdep \
+                             dpkg-dev fakeroot devscripts build-essential \
+                             debhelper dh-python \
+                             python3-bloom python3-ament-package && \
+              source /opt/ros/humble/setup.bash && \
+              mkdir -p /etc/ros/rosdep/sources.list.d && \
+              # Use absolute path to rosdep_override.yaml inside the container
+              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              rosdep init || true && \
+              rosdep update && \
+              rosdep install --from-paths . --ignore-src -r -y && \
+              mkdir -p /workspace/debs
+              export INITIAL_DIR=\$(pwd)
+
+              # Build each package in dependency order
+              for pkg in \$(colcon list --paths-only --topological-order); do
+                echo 'Processing package:' \$pkg
+                cd \$pkg
+
+                # Generate Debian package metadata
+                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
+
+                # Build the Debian package
+                fakeroot debian/rules binary
+
+                # Move .debs to shared directory
+                find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
+
+                # Install built packages for dependency resolution
+                dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+                source /opt/ros/humble/setup.bash
+
+                cd \$INITIAL_DIR
+              done
+            "
+
+      - name: Upload .deb files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros-debian-packages
+          path: debs/*.deb
