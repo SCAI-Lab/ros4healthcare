@@ -1,6 +1,8 @@
 import os
 from glob import glob
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+import subprocess
 
 package_name = 'polar_ros2'
 
@@ -26,5 +28,5 @@ setup(
             'console_scripts': [
                     'polar_connector = polar_ros2.polar_ros2:main',
             ],
-    },
+    }
 )

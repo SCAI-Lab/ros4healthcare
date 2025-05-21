@@ -70,11 +70,6 @@ set(msg_files
 
 )
 
-#set (srv_files
-#   "srv/AddThreeInts.srv"
-#)
-
-
 # Generate ROS interfaces
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
@@ -94,4 +89,3 @@ set(LD_LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
 
 # Install package metadata
 ament_package()
-
