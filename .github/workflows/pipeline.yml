@@ -36,7 +36,6 @@ jobs:
 
       - name: Run ARM64 Docker container to build packages
         run: |
-          # Ensure rosdep_override.yaml exists and is accessible
           if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
             echo "Error: rosdep_override.yaml not found!" && exit 1
           fi
@@ -44,56 +43,54 @@ jobs:
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            arm64v8/ros:humble-ros-base bash -c "
-              apt update && \
+            arm64v8/ros:humble-ros-base bash <<'EOF'
+              set -e
+              apt update
               apt install -y git python3-colcon-common-extensions python3-rosdep \
-                             dpkg-dev fakeroot devscripts build-essential \
-                             debhelper dh-python \
-                             python3-bloom python3-ament-package && \
-              source /opt/ros/humble/setup.bash && \
-              mkdir -p /etc/ros/rosdep/sources.list.d && \
-              # Use absolute path to rosdep_override.yaml inside the container
-              echo 'yaml file:///tmp/rosdep_combined_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
-              # Start new combined override file with static entries (if the file exists)
+                            dpkg-dev fakeroot devscripts build-essential \
+                            debhelper dh-python \
+                            python3-bloom python3-ament-package
+
+              source /opt/ros/humble/setup.bash
+              mkdir -p /etc/ros/rosdep/sources.list.d
+
+              # Create combined override file
+              echo 'yaml file:///tmp/rosdep_combined_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list
+
               if [ -f /workspace/rosdep_override.yaml ]; then
                 cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
               else
                 echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
-              fi && \
+              fi
 
-              # Append dynamic overrides for all packages in repo
               for pkg in $(colcon list --names-only); do
                 echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
                 echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
                 echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
-              done && \
-              rosdep init || true && \
-              rosdep update && \
-              rosdep install --from-paths . --ignore-src -r -y && \
+              done
+
+              rosdep init || true
+              rosdep update
+              rosdep install --from-paths . --ignore-src -r -y
+
               mkdir -p /workspace/debs
-              export INITIAL_DIR=\$(pwd)
+              export INITIAL_DIR=$(pwd)
 
-              # Build each package in dependency order
-              for pkg in \$(colcon list --paths-only --topological-order); do
-                echo 'Processing package:' \$pkg
-                cd \$pkg
+              for pkg in $(colcon list --paths-only --topological-order); do
+                echo "Processing package: $pkg"
+                cd $pkg
 
-                # Generate Debian package metadata
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
-
-                # Build the Debian package
                 fakeroot debian/rules binary
 
-                # Move .debs to shared directory
                 find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
-
-                # Install built packages for dependency resolution
                 dpkg -i /workspace/debs/*.deb || apt-get install -f -y
-                source /opt/ros/humble/setup.bash
 
-                cd \$INITIAL_DIR
+                source /opt/ros/humble/setup.bash
+                cd $INITIAL_DIR
               done
-            "
+          EOF
+
 
       - name: Upload .deb files as artifacts
         uses: actions/upload-artifact@v4
