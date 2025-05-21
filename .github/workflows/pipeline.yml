@@ -60,7 +60,7 @@ jobs:
           for pkg in $(colcon list --names-only); do
             echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
             echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
-            echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
+            echo "    jammy: [ros-humble-$pkg]" >> /tmp/rosdep_combined_override.yaml
           done
 
           rosdep init || true
