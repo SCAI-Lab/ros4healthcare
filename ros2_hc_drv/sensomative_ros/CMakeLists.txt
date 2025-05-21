@@ -36,6 +36,11 @@ install(PROGRAMS
   scripts/sensomative_wrapper.py
   DESTINATION lib/${PROJECT_NAME}
 )
+# Install Python executables
+install(PROGRAMS
+  scripts/pressure_visualizer.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 install(DIRECTORY
   launch
@@ -45,16 +50,6 @@ install(DIRECTORY
 install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
-)
-
-install(
-  FILES hc-sensomative-driver.service
-  DESTINATION /usr/lib/systemd/system
-)
-
-# Enabling the service to run automatically after reboot
-execute_process(
-  COMMAND systemctl enable hc-sensomative-driver.service
 )
 
 if(BUILD_TESTING)

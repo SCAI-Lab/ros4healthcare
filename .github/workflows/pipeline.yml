@@ -69,6 +69,7 @@ jobs:
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
 
                 # Build the Debian package
+                rosdep install --from-paths . --ignore-src -r -yS
                 fakeroot debian/rules binary
 
                 # Move .debs to shared directory
