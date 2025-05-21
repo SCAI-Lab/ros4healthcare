@@ -53,7 +53,20 @@ jobs:
               source /opt/ros/humble/setup.bash && \
               mkdir -p /etc/ros/rosdep/sources.list.d && \
               # Use absolute path to rosdep_override.yaml inside the container
-              echo 'yaml file:///workspace/rosdep_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              echo 'yaml file:///tmp/rosdep_combined_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list && \
+              # Start new combined override file with static entries (if the file exists)
+              if [ -f /workspace/rosdep_override.yaml ]; then
+                cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
+              else
+                echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
+              fi && \
+
+              # Append dynamic overrides for all packages in repo
+              for pkg in $(colcon list --names-only); do
+                echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
+                echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
+                echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
+              done && \
               rosdep init || true && \
               rosdep update && \
               rosdep install --from-paths . --ignore-src -r -y && \
@@ -69,7 +82,6 @@ jobs:
                 bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
 
                 # Build the Debian package
-                rosdep install --from-paths . --ignore-src -r -yS
                 fakeroot debian/rules binary
 
                 # Move .debs to shared directory
