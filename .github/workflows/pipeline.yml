@@ -34,63 +34,65 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run ARM64 Docker container to build packages
+      - name: Create build script for Docker
         run: |
-          if [ ! -f "${{ github.workspace }}/rosdep_override.yaml" ]; then
-            echo "Error: rosdep_override.yaml not found!" && exit 1
+          cat <<'EOF' > build_in_docker.sh
+          #!/bin/bash
+          set -e
+
+          apt update
+          apt install -y git python3-colcon-common-extensions python3-rosdep \
+                        dpkg-dev fakeroot devscripts build-essential \
+                        debhelper dh-python \
+                        python3-bloom python3-ament-package
+
+          source /opt/ros/humble/setup.bash
+          mkdir -p /etc/ros/rosdep/sources.list.d
+
+          echo 'yaml file:///tmp/rosdep_combined_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list
+
+          if [ -f /workspace/rosdep_override.yaml ]; then
+            cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
+          else
+            echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
           fi
 
+          for pkg in $(colcon list --names-only); do
+            echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
+            echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
+            echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
+          done
+
+          rosdep init || true
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+          mkdir -p /workspace/debs
+          export INITIAL_DIR=$(pwd)
+
+          for pkg in $(colcon list --paths-only --topological-order); do
+            echo "Processing package: $pkg"
+            cd $pkg
+
+            bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
+            fakeroot debian/rules binary
+
+            find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
+            dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+
+            source /opt/ros/humble/setup.bash
+            cd $INITIAL_DIR
+          done
+          EOF
+
+          chmod +x build_in_docker.sh
+
+      - name: Run ARM64 Docker container to build packages
+        run: |
           docker run --rm --privileged --platform linux/arm64 \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            arm64v8/ros:humble-ros-base bash -c "$(cat <<'EOF'
-              set -e
-              apt update
-              apt install -y git python3-colcon-common-extensions python3-rosdep \
-                            dpkg-dev fakeroot devscripts build-essential \
-                            debhelper dh-python \
-                            python3-bloom python3-ament-package
-
-              source /opt/ros/humble/setup.bash
-              mkdir -p /etc/ros/rosdep/sources.list.d
-
-              echo 'yaml file:///tmp/rosdep_combined_override.yaml' > /etc/ros/rosdep/sources.list.d/50-local.list
-
-              if [ -f /workspace/rosdep_override.yaml ]; then
-                cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
-              else
-                echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
-              fi
-
-              for pkg in $(colcon list --names-only); do
-                echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
-                echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
-                echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
-              done
-
-              rosdep init || true
-              rosdep update
-              rosdep install --from-paths . --ignore-src -r -y
-
-              mkdir -p /workspace/debs
-              export INITIAL_DIR=$(pwd)
-
-              for pkg in $(colcon list --paths-only --topological-order); do
-                echo "Processing package: $pkg"
-                cd $pkg
-
-                bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
-                fakeroot debian/rules binary
-
-                find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
-                dpkg -i /workspace/debs/*.deb || apt-get install -f -y
-
-                source /opt/ros/humble/setup.bash
-                cd $INITIAL_DIR
-              done
-              EOF
-            )"
-
+            arm64v8/ros:humble-ros-base bash /workspace/build_in_docker.sh
 
       - name: Upload .deb files as artifacts
         uses: actions/upload-artifact@v4
