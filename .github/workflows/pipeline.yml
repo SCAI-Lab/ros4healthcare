@@ -58,9 +58,10 @@ jobs:
           fi
 
           for pkg in $(colcon list --names-only); do
+            deb_name=$(echo "$pkg" | tr '_' '-')
             echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
             echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
-            echo "    jammy: [ros-humble-$pkg]" >> /tmp/rosdep_combined_override.yaml
+            echo "    jammy: [ros-humble-$deb_name]" >> /tmp/rosdep_combined_override.yaml
           done
 
           rosdep init || true
