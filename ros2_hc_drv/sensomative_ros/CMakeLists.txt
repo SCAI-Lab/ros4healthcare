@@ -36,6 +36,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/sensomative_wrapper.py
+  scripts/pressure_visualizer.py  
   DESTINATION lib/${PROJECT_NAME}
 )
 
