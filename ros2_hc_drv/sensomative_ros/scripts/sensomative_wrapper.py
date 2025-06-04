@@ -14,11 +14,9 @@ class SensomativeWrapper(Node):
     def __init__(self):
         super().__init__('sensomative_wrapper')
 
-        # Declare parameters with proper types
         self.declare_parameter('mac_add', "CC:CC:CC:0A:39:73")
         self.declare_parameter('hci_mac', "")  
 
-        # Get parameter values
         self.address = self.get_parameter('mac_add').get_parameter_value().string_value
         self.hci_mac = self.get_parameter('hci_mac').get_parameter_value().string_value
         
@@ -33,12 +31,11 @@ class SensomativeWrapper(Node):
         
         self.device_unavailable_logged = False
         
-        # Add some logging to help debug
         self.logger_.info(f"Attempting to connect to device: \"{self.address}\"")
         if self.hci_mac:
             self.logger_.info(f"Using HCI MAC: \"{self.hci_mac}\"")
         
-        timer_period = 0.1  # 1 - Frequency of the sampling
+        timer_period = 0.1  
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
     def timer_callback(self):
@@ -57,7 +54,6 @@ class SensomativeWrapper(Node):
         msg.header.cols = 4
         
         if not self.device_exists:
-            # Log once that device is not available
             if not self.device_unavailable_logged:
                 self.logger_.info("Device not available, publishing zero data")
                 self.device_unavailable_logged = True
