@@ -58,9 +58,10 @@ jobs:
           fi
 
           for pkg in $(colcon list --names-only); do
+            deb_pkg="ros-humble-${pkg//_/-}"
             echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
             echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
-            echo "    jammy: [$pkg]" >> /tmp/rosdep_combined_override.yaml
+            echo "    jammy: [$deb_pkg]" >> /tmp/rosdep_combined_override.yaml
           done
 
           rosdep init || true
@@ -75,6 +76,13 @@ jobs:
             cd $pkg
 
             bloom-generate rosdebian --ros-distro humble --os-name ubuntu --os-version jammy
+
+            if ! grep -r --include='CMakeLists.txt' 'add_executable\|ament_target_dependencies' .; then
+              echo "No C++ binaries detected, removing \${shlibs:Depends} from debian/control"
+              sed -i 's/${shlibs:Depends},\s*//g' debian/control
+              sed -i 's/${shlibs:Depends}//g' debian/control
+            fi
+
             fakeroot debian/rules binary
 
             find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
