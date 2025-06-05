@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(ros4hc_full)
+project(ros4hc_demo_full)
 
 find_package(ament_cmake REQUIRED)
 

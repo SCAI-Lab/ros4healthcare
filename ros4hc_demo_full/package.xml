@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>ros4hc_full</name>
+  <name>ros4hc_demo_full</name>
   <version>0.0.0</version>
   <description>Metapackage and configs for ROS4HC Demo</description>
   <maintainer email="moperez@ethz.ch">Monica Perez Serrano</maintainer>
