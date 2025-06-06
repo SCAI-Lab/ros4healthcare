@@ -4,7 +4,8 @@ from gi.repository import GLib
 import logging as log
 from pydbus import SystemBus
 from pydbus.proxy import ProxyObject
-from typing import List, Optional
+from typing import List, Optional, Type
+from types import TracebackType
 
 from bluetooth_common.helper_functions import (
     find_first_matching_device,
@@ -52,12 +53,18 @@ class BluetoothConnectionManager:
                 )
         return None
 
-    def __enter__(self):
+    def __enter__(self) -> "BluetoothConnectionManager":
         self._subscribe_to_disconnects()
         self._ensure_connected()
         return self
 
-    def __exit__(self, _exc_type, _exc_val, _exc_tb):
+    def __exit__(
+        self,
+        _exc_type: Optional[Type[BaseException]],
+        _exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ):
+
         self._disconnect()
         self.loop.quit()
 

@@ -21,7 +21,8 @@ class SensomativeRos(Node):
             adapter=adapter,
             target_uuids=target_uuids,
         )
-        self.driver = self.bluetooth_connection_manager.__enter__()
+        self.driver_context = self.bluetooth_connection_manager.__enter__()
+        self.driver = self.driver_context
 
         self.publisher_ = self.create_publisher(Pressure, "pressure1", 10)
         self.logger_ = self.get_logger()
@@ -34,13 +35,22 @@ class SensomativeRos(Node):
         return self.bluetooth_connection_manager.mac_address
 
     def timer_callback(self):
-        msg = Pressure()
-        msg.header = PressureHeader()
-        msg.header.header = Header()
-        msg.header.device_serial_number = self.mac_address
         data = self.driver.get_data()
         if data is not None:
-            msg.pressure = data[0:12]
+            msg = Pressure()
+            msg.header = PressureHeader()
+            msg.header.header = Header()
+            msg.header.header.stamp = self.get_clock().now().to_msg()
+            msg.header.device_serial_number = self.mac_address
+            msg.header.unit = "Pa"
+            msg.header.sampling_frequency = 10
+            msg.header.resolution = 1.0
+            msg.header.accuracy = 0.95
+            msg.header.max_range = 65535.0
+            msg.header.min_range = 0.0
+            msg.header.rows = 3
+            msg.header.cols = 4
+            msg.pressure = [int(max(0, min(65535, x))) for x in data[0:12]]
             msg.header.rows = 3
             msg.header.cols = 4
             msg.header.header.stamp = self.get_clock().now().to_msg()
@@ -48,6 +58,6 @@ class SensomativeRos(Node):
             self.publisher_.publish(msg)  # publish the message
 
     def destroy_node(self):
-        super().destroy_node()
         if hasattr(self, "driver_context"):
-            self.bluetooth_connection_manager.__exit__(None, None, None)
+            self.driver_context.__exit__(None, None, None)
+        super().destroy_node()
