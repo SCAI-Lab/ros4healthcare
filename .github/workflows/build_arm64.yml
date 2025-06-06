@@ -1,16 +1,3 @@
-# name: PR Workflow
-
-# on:
-#   pull_request:
-#     branches:
-#       - '**'
-
-# jobs:
-#   call-reusable-workflow:
-#     uses: SCAI-Lab/scai-ci-templates/.github/workflows/build_arm64.yml@main
-#     with:
-#       run_target: "pull_request"
-
 name: Create Debians (ARM64) for all packages
 
 on:
