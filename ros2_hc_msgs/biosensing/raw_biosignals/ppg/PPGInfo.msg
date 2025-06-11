@@ -1,4 +1,4 @@
-BiosignalInfo   biosignal_info
+DeviceInfo   device_info
 
 uint16      wavelengths         # Wavelength of emmitted light in [nm]
 float32[]   ac_component        # Pulsatile AC component (cardic synchronous variations in blood volume)

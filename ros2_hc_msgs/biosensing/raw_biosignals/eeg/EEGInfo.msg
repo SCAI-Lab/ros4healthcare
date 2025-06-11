@@ -1,4 +1,4 @@
-BiosignalInfo   biosignal_info
+DeviceInfo   device_info
 
 uint8   channel_number 			        # The channel number of the electrode 
 string  electrode_name                  # Electrode name according to the standard electrode position nomenclature 

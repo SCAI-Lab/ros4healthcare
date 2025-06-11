@@ -1,4 +1,4 @@
-BiosignalInfo   biosignal_info
+DeviceInfo   device_info
 
 string[]    electrode_placement                     # Location where the electrodes are placed 
 float32     gazefield_background_light_brightness   # The brightness of the gazeflied background light in [cd/m²]
