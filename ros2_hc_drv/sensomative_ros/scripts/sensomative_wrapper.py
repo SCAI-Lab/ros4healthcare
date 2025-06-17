@@ -29,23 +29,24 @@ def main():
 
     rclpy.init()
 
-    print("Hello")
-    
+    node = SensomativeRos(
+        regex_pattern=args.regex_pattern,
+        adapter=args.adapter,
+        target_uuids=args.target_uuids,
+    )
+
     try:
-        print("Start")
-        node = SensomativeRos(
-            regex_pattern=args.regex_pattern,
-            adapter=args.adapter,
-            target_uuids=args.target_uuids,
-        )
         rclpy.spin(node)
     except KeyboardInterrupt:
-        log.info("Sensomative Node received an interrupt signal, shutting down.")
-    except Exception as e:
-        log.error("An error occurred in Sensomative Wrapper:", str(e))
+        log.info("Ctrl+C received. Shutting down Sensomative node cleanly.")
+    except rclpy._rclpy_pybind11.RCLError as e:
+        log.warning(f"Caught an rclpy exception. Attempting shutdown {e}")
     finally:
-        print("Finally")
-        if node is not None:
+        try:
             node.destroy_node()
-        if rclpy.ok():
             rclpy.shutdown()
+        except rclpy._rclpy_pybind11.RCLError as e:
+            log.warning(f"Could not shut down ros cleanly: {e}")
+
+if __name__ == "__main__":
+    main()

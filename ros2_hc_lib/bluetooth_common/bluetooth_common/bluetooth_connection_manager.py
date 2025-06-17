@@ -4,6 +4,7 @@ from gi.repository import GLib
 import logging as log
 from pydbus import SystemBus
 from pydbus.proxy import ProxyObject
+from threading import Thread
 from typing import List, Optional, Type
 from types import TracebackType
 
@@ -41,6 +42,7 @@ class BluetoothConnectionManager:
         self.reconnecting = False
         self.connected = False
         self.loop = GLib.MainLoop()
+        self._loop_thread: Optional[Thread] = None
 
     @property
     def mac_address(self) -> Optional[str]:
@@ -56,17 +58,23 @@ class BluetoothConnectionManager:
     def __enter__(self) -> "BluetoothConnectionManager":
         self._subscribe_to_disconnects()
         self._ensure_connected()
+        self._loop_thread = Thread(target=self.loop.run, daemon=True)
+        self._loop_thread.start()
         return self
 
     def __exit__(
         self,
         _exc_type: Optional[Type[BaseException]],
         _exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        _exc_tb: Optional[TracebackType],
     ):
 
         self._disconnect()
-        self.loop.quit()
+        if self.loop.is_running():
+            self.loop.quit()
+    
+        if self._loop_thread is not None:
+            self._loop_thread.join()
 
     def _connect_device(self, device_path: str):
         trust_device(bus=self.bus, device_path=device_path)
@@ -76,7 +84,7 @@ class BluetoothConnectionManager:
             self.device_path = device_path
             self.connected = True
             log.info(
-                f"[BluetoothConnectionManager::_connect_device] Connected to {device_path}"
+                f"[BluetoothConnectionManager::_connect_device] Connected to {device_path}."
             )
         except GLib.GError as e:
             self.connected = False
@@ -85,7 +93,6 @@ class BluetoothConnectionManager:
                 f"[_connect_device] Failed to connect to {device_path}. Forgetting current "
                 "device and reattempting..."
             )
-
         except Exception as e:
             self.connected = False
             log.error(
@@ -221,10 +228,15 @@ class BluetoothConnectionManager:
         if self.connected:
             try:
                 return self.read_characteristic()
+            except GLib.GError as e:
+                log.error(
+                    "[BluetoothConnectionManager::get_data] Failed to "
+                    f"read characteristic: {e}"
+                )
             except Exception as e:
                 log.error(
-                    "[BluetoothConnectionManager::start_periodic_read] Failed to "
-                    f"read characteristic: {e}"
+                    "[BluetoothConnectionManager::get_data] Unknown error "
+                    f"when reading characteristic: {e}"
                 )
         return None
 

@@ -11,6 +11,7 @@
   
   <depend>rclpy</depend>
 
+  <exec_depend>bluetooth_common</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>ros2_hc_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>

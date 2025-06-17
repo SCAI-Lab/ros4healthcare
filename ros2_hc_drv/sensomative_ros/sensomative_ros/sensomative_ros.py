@@ -25,9 +25,8 @@ class SensomativeRos(Node):
         self.driver = self.driver_context
 
         self.publisher_ = self.create_publisher(Pressure, "pressure1", 10)
-        self.logger_ = self.get_logger()
 
-        timer_period = 0.1  # 1 - Frequency of the sampling
+        timer_period = 0.1  # Frequency of the sampling
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
     @property
@@ -35,6 +34,11 @@ class SensomativeRos(Node):
         return self.bluetooth_connection_manager.mac_address
 
     def timer_callback(self):
+        if self.driver is None:
+            self.get_logger().warn(
+                "The bluetooth driver is None. Not publishing any data."
+            )
+            return
         data = self.driver.get_data()
         if data is not None:
             msg = Pressure()
@@ -55,7 +59,7 @@ class SensomativeRos(Node):
             msg.header.cols = 4
             msg.header.header.stamp = self.get_clock().now().to_msg()
 
-            self.publisher_.publish(msg)  # publish the message
+            self.publisher_.publish(msg)
 
     def destroy_node(self):
         if hasattr(self, "driver_context"):
