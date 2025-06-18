@@ -3,4 +3,4 @@ polar_connector:
     publish_acceleration: True
     publish_hr: True
     publish_ecg: False
-    bluetooth_adapter: "hci1"
+    bluetooth_adapter: "hci0"

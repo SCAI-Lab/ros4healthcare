@@ -1,13 +1,11 @@
 from bleak import BleakScanner
 import asyncio
-import numpy as np
-import argparse
+import logging as log
 from .submodules.PolarH10 import PolarH10
 from .submodules.BreathingAnalyser import BreathingAnalyser
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int32
-
+from geometry_msgs.msg import Vector3Stamped
 
 class PolarConnector(Node):
 
@@ -18,7 +16,7 @@ class PolarConnector(Node):
         self.declare_parameter('publish_acceleration', True) 
         self.declare_parameter('publish_ecg', False) 
         self.declare_parameter('bluetooth_adapter', "hci0") 
-        self.pub_rr = self.create_publisher(Int32, "polar_rr", 10)
+        self.pub_rr = self.create_publisher(Vector3Stamped, "polar_rr", 10)
 
     def start(self):
         self.publish_acceleration = self.get_parameter('publish_acceleration').get_parameter_value().bool_value
@@ -33,30 +31,27 @@ class PolarConnector(Node):
             if self.pd is not None:
                 loop_0.run_until_complete(self.run(self.pd))
         except KeyboardInterrupt:
-            print("Polar recording stopped by user.")
+            log.info("[PolarConnector] Polar recording stopped by user.")
+        except Exception as e:
+            log.error(f"[PolarConnector] Uncaught exception: {e}")
+        finally:
             loop_0.run_until_complete(self.disconnect(self.pd))
     
   
     async def get_device(self):
         devices = await BleakScanner.discover()
-        polar_device = None 
-        polar_device_found = False
-        acc_data = None
-        ibi_data = None    
+        print(f"Devices: {devices}")
         for device in devices:
-            if device.name is not None and "Polar" in device.name:
-                polar_device_found = True
-                polar_device = PolarH10(self, device, self.bluetooth_adapter, self.publish_acceleration, self.publish_hr, self.publish_ecg)
-                break
+            if device.name is not None and "Polar H10" in device.name:
+                return PolarH10(self, device, self.bluetooth_adapter, self.publish_acceleration, self.publish_hr, self.publish_ecg)
         
-        if not polar_device_found:
-            print("No Polar device found")
-            self.get_logger().error("No Polar device found")
+        log.error("[PolarConnector] No Polar device found. Retrying...")
+        await self.get_device()
             
-        return polar_device
 
     async def run(self, polar_device):
         await polar_device.connect()
+        log.info("[PolarConnector] Polar device is connected.")
         await polar_device.get_device_info()
         await polar_device.print_device_info()
         if self.publish_acceleration:
@@ -67,22 +62,28 @@ class PolarConnector(Node):
             await polar_device.start_ecg_stream()
               
         while True:
+            print("Publishing polar")
             await asyncio.sleep(1)
             acc_data = polar_device.get_acc_data()
             ibi_data = polar_device.get_ibi_data()
+            if acc_data is None or ibi_data is None:
+                log.warning(f"Received invalid data. Acc: {acc_data}, ibi_data: {ibi_data}")
+                continue
             breathing_analyser = BreathingAnalyser(acc_data, ibi_data)
-            msg = Int32()
-            msg.data = int(breathing_analyser.get_rr())
+            msg = Vector3Stamped()
+            msg.vector.x = float(breathing_analyser.get_rr())
+            msg.header.stamp = self.get_clock().now().to_msg()
             self.pub_rr.publish(msg)
     
     async def disconnect(self, polar_device):
-        if self.publish_acceleration:
-            await polar_device.stop_acc_stream()
-        if self.publish_hr:
-            await polar_device.stop_hr_stream()
-        if self.publish_ecg:
-            await polar_device.stop_ecg_stream()
-        await polar_device.disconnect()
+        if polar_device is not None:
+            if self.publish_acceleration:
+                await polar_device.stop_acc_stream()
+            if self.publish_hr:
+                await polar_device.stop_hr_stream()
+            if self.publish_ecg:
+                await polar_device.stop_ecg_stream()
+            await polar_device.disconnect()
 
 
 

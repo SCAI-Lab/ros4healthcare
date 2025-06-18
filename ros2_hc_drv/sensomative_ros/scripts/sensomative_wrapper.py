@@ -25,7 +25,7 @@ def main():
         ],
         help="List of target GATT characteristic UUIDs",
     )
-    args = parser.parse_args()
+    args, _unknown = parser.parse_known_args()
 
     rclpy.init()
 

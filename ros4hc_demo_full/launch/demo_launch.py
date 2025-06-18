@@ -14,31 +14,33 @@ def generate_launch_description():
 
     polar_node=Node(
         package = 'polar_ros2',
-        name = 'polar_connector',
+        name = 'polar',
         executable = 'polar_connector',
         parameters = [polar_config]
     )
     ld.add_action(polar_node)
 
-    sensomative_config = os.path.join(
-        get_package_share_directory('ros2_hc_launch'),
-        'config',  
-        'params.yaml'
-    )
-
     sensomative_node = Node(
         package='sensomative_ros',
         executable='sensomative_wrapper.py',
-        name='sensomative_ros',
-        parameters=[sensomative_config],
+        name='sensomative',
+        parameters=['--adapter', 'hci0'],
         output='screen'
     )
     ld.add_action(sensomative_node)
 
+    sensomative_visualizer = Node(
+        package='sensomative_ros',
+        executable='pressure_visualizer.py',
+        name='sensomative_visualizer',
+        output='screen'
+    )
+    ld.add_action(sensomative_visualizer)
+
     m5_node = Node(
         package='m5_udp_listener',
-        executable='m5_listener_multiple.py',
-        name='sensomative_ros',
+        executable='udp_listener_multiple',
+        name='m5_udp_multiple',
         output='screen'
     )
     ld.add_action(m5_node)

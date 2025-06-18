@@ -1,11 +1,11 @@
 from bleak import BleakClient
 import asyncio
+import logging as log
 import time
 import numpy as np
 import math
-from std_msgs.msg import Int32
 from ros2_hc_msgs.msg import HR
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3Stamped
 
 
 
@@ -79,11 +79,11 @@ class PolarH10:
         self.publish_hr = publish_hr
         self.publish_ecg = publish_ecg
         if self.publish_acceleration:
-            self.pub_acc = self.node.create_publisher(Vector3, "polar_acc", 10)
+            self.pub_acc = self.node.create_publisher(Vector3Stamped, "polar_acc", 10)
         if self.publish_hr:
             self.pub_hr = self.node.create_publisher(HR, "polar_hr", 10)        
         if self.publish_ecg:
-            self.pub_ecg = self.node.create_publisher(Int32, "polar_ecg", 10)
+            self.pub_ecg = self.node.create_publisher(Vector3Stamped, "polar_ecg", 10)
 
 
     def hr_data_conv(self, sender, data):  
@@ -171,10 +171,11 @@ class PolarH10:
                 self.acc_stream_values.extend([[x, y, z]])
                 self.acc_stream_times.extend([sample_timestamp])
                 if self.publish_acceleration:
-                    acc_msg = Vector3()
-                    acc_msg.x = float(x)/1000
-                    acc_msg.y = float(y)/1000
-                    acc_msg.z = float(z)/1000
+                    acc_msg = Vector3Stamped()
+                    acc_msg.header.stamp = self.node.get_clock().now().to_msg()
+                    acc_msg.vector.x = float(x)/1000
+                    acc_msg.vector.y = float(y)/1000
+                    acc_msg.vector.z = float(z)/1000
                     self.pub_acc.publish(acc_msg)
                 sample_timestamp += time_step
     
@@ -195,8 +196,9 @@ class PolarH10:
                 self.ecg_stream_values.extend([ecg])
                 self.ecg_stream_times.extend([sample_timestamp])
                 if self.publish_ecg:
-                    ecg_msg = Int32()
-                    ecg_msg.data = int(ecg/1000)
+                    ecg_msg = Vector3Stamped()
+                    ecg_msg.header.stamp = self.node.get_clock().now().to_msg()
+                    ecg_msg.vector.x = float(ecg/1000)
                     self.pub_ecg.publish(ecg_msg)
                 sample_timestamp += time_step
 
@@ -212,11 +214,26 @@ class PolarH10:
         )
     
     async def connect(self):
-        self.bleak_client = BleakClient(self.bleak_device, adapter=self.bt_adapter)
-        await self.bleak_client.connect()
+        try:
+            self.bleak_client = BleakClient(self.bleak_device, adapter=self.bt_adapter)
+            await self.bleak_client.connect(timeout=20.0)
+            print("Connected!")
+            self.bleak_client.set_disconnected_callback(self.handle_disconnect)
+
+        except asyncio.TimeoutError:
+            log.error("[PolarH10::connect] Failed to connect to device. Attempting again...")
+            await self.connect()
     
+    def handle_disconnect(self, client):
+        log.warning(f"[PolarH10] Disconnected from {self.bleak_client.address}. Attempting to reconnect...")
+        asyncio.create_task(self.connect())
+
     async def disconnect(self):
-        await self.bleak_client.disconnect()
+        if self.bleak_client and self.bleak_client.is_connected:
+            await self.bleak_client.disconnect()
+            print("Disconnected.")
+        else:
+            log.warning("[PolarH10::disconnect] Client already disconnected.")
 
     async def get_device_info(self):
         self.model_number = await self.bleak_client.read_gatt_char(PolarH10.MODEL_NBR_UUID)
@@ -245,8 +262,11 @@ class PolarH10:
         print("Collecting ACC data...", flush=True)
 
     async def stop_acc_stream(self):
-        await self.bleak_client.stop_notify(PolarH10.PMD_CHAR2_UUID)
-        print("Stopping ACC data...", flush=True)
+        if self.bleak_client.is_connected:
+            await self.bleak_client.stop_notify(PolarH10.PMD_CHAR2_UUID)
+            print("Stopping ACC data...", flush=True)
+        else:
+            log.warning("[PolarH10::stop_acc_stream] Tried to stop ACC, but client not connected.")
 
     async def start_hr_stream(self):
         await self.bleak_client.start_notify(PolarH10.HEART_RATE_MEASUREMENT_UUID, self.hr_data_conv)
@@ -258,23 +278,30 @@ class PolarH10:
         print("Collecting ECG data...", flush=True)
 
     async def stop_hr_stream(self):
-        await self.bleak_client.stop_notify(PolarH10.HEART_RATE_MEASUREMENT_UUID)
-        print("Stopping HR data...", flush=True)
-
+        if self.bleak_client and self.bleak_client.is_connected:
+            await self.bleak_client.stop_notify(PolarH10.HEART_RATE_MEASUREMENT_UUID)
+            print("Stopping HR data...", flush=True)
+        else:
+            log.warning("[PolarH10::stop_hr_stream] Tried to stop HR stream, but client is not connected.")
 
     async def stop_ecg_stream(self):
-        await self.bleak_client.stop_notify(PolarH10.PMD_CHAR2_UUID)
-        print("Stopping ECG data...", flush=True)
+        if self.bleak_client and self.bleak_client.is_connected:
+            await self.bleak_client.stop_notify(PolarH10.PMD_CHAR2_UUID)
+            print("Stopping ECG data...", flush=True)
+        else:
+            log.warning("[PolarH10::stop_ecg_stream] Tried to stop ECG stream, but client is not connected.")
             
     def get_acc_data(self):
-        
         acc_times = np.array(self.acc_stream_times)
+        if len(acc_times) == 0:
+            return None
         acc_times = acc_times - acc_times[0] # rel to start of acc session
         self.acc_data = {'times': acc_times[-5000:], 'values': np.array(self.acc_stream_values[-5000:])}
         return self.acc_data
     
     def get_ibi_data(self):
-
+        if self.ibi_stream_times is None or self.acc_stream_start_time is None:
+            return None
         ibi_times = np.array(self.ibi_stream_times)
         ibi_times = ibi_times - self.acc_stream_start_time # rel to start of acc session time in unix s
         self.ibi_data = {'times': ibi_times[-5000:], 'values': np.array(self.ibi_stream_values[-5000:])}
