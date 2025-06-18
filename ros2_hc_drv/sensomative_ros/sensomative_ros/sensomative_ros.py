@@ -45,7 +45,7 @@ class SensomativeRos(Node):
             msg.header = PressureHeader()
             msg.header.header = Header()
             msg.header.header.stamp = self.get_clock().now().to_msg()
-            msg.header.device_serial_number = self.mac_address
+            msg.header.device_serial_number = str(self.mac_address)
             msg.header.unit = "Pa"
             msg.header.sampling_frequency = 10
             msg.header.resolution = 1.0
