@@ -87,7 +87,7 @@ class PressureVisualiser(Node):
             x=0.5, y=0.05,  
             xref="paper", yref="paper",
             showarrow=False,
-            font=dict(size=25, color="black", family="Arial Black", weight="bold"), 
+            font=dict(size=25, color="black", family="Arial Black"), 
             opacity=0.8 
         )
 

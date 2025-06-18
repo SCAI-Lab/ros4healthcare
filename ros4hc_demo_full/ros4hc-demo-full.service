@@ -1,0 +1,12 @@
+[Unit]
+Description=Launch all nodes for the ROS4HC demo
+After=network.target
+
+[Service]
+User=scai
+Environment=/home/scai/ros4hc.env
+ExecStart=/bin/bash -c 'source /opt/ros/current/setup.bash && source install/setup.bash && ros2 launch ros4hc_demo_full ros4hc_demo.launch.py'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
