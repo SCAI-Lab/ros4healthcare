@@ -8,9 +8,9 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(
-  FILES ros4hc-demo-full.service
-  DESTINATION /usr/lib/systemd/system
-)
+#install(
+#  FILES ros4hc-demo-full.service
+#  DESTINATION /usr/lib/systemd/system
+#)
 
 ament_package()
