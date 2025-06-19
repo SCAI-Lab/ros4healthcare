@@ -17,7 +17,6 @@ setup(
     maintainer_email='moperez@ethz.ch',
     description='Library to manage connections to sensors via bluetooth.',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
         ],

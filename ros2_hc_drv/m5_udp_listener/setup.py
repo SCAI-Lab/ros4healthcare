@@ -17,7 +17,6 @@ setup(
     maintainer_email='icra_laptop@example.com',
     description='UDP listener package for M5StickC Plus data reception',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             # Update paths to match your directory structure

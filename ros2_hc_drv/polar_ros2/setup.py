@@ -23,7 +23,6 @@ setup(
     maintainer_email='sgaryfallidi@student.ethz.ch',
     description='ROS2 wrapper to collect data from Polar H10',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
             'console_scripts': [
                     'polar_connector = polar_ros2.polar_ros2:main',
