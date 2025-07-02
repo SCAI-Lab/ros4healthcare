@@ -47,6 +47,7 @@ class UdpListener(Node):
                 self.get_logger().info(f"Created new topic for {unique_id}")
 
             msg = Imu()
+            msg.header.stamp = self.get_clock().now().to_msg()
             degtopi = 0.0174533
 
             # Set linear acceleration

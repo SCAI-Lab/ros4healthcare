@@ -33,6 +33,7 @@ def generate_launch_description():
         package='sensomative_ros',
         executable='pressure_visualizer.py',
         name='sensomative_visualizer',
+        parameter=[{'adapter': 'hci1'}]
         output='screen'
     )
     ld.add_action(sensomative_visualizer)

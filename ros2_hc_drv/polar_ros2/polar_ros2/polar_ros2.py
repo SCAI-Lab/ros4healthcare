@@ -52,17 +52,15 @@ class PolarConnector(Node):
     async def run(self, polar_device):
         await polar_device.connect()
         log.info("[PolarConnector] Polar device is connected.")
-        await polar_device.get_device_info()
-        await polar_device.print_device_info()
-        if self.publish_acceleration:
-            await polar_device.start_acc_stream()
+        # await polar_device.get_device_info()
+        # await polar_device.print_device_info()
+        if self.publish_acceleration or self.publish_ecg:
+            await polar_device.start_combined_stream()
         if self.publish_hr:
             await polar_device.start_hr_stream()
-        if self.publish_ecg:
-            await polar_device.start_ecg_stream()
+
               
         while True:
-            print("Publishing polar")
             await asyncio.sleep(1)
             acc_data = polar_device.get_acc_data()
             ibi_data = polar_device.get_ibi_data()
@@ -77,12 +75,10 @@ class PolarConnector(Node):
     
     async def disconnect(self, polar_device):
         if polar_device is not None:
-            if self.publish_acceleration:
-                await polar_device.stop_acc_stream()
+            if self.publish_acceleration or self.publish_ecg:
+                await polar_device.stop_combined_stream()
             if self.publish_hr:
                 await polar_device.stop_hr_stream()
-            if self.publish_ecg:
-                await polar_device.stop_ecg_stream()
             await polar_device.disconnect()
 
 

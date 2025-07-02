@@ -16,6 +16,12 @@ def main():
         "--adapter", type=str, default="hci0", help="Bluetooth adapter name"
     )
     parser.add_argument(
+        "--mac-address",
+        type=str,
+        default=None,
+        help="MAC address of the device (optional)",
+    )
+    parser.add_argument(
         "--target-uuids",
         type=str,
         nargs="+",
@@ -32,6 +38,7 @@ def main():
     node = SensomativeRos(
         regex_pattern=args.regex_pattern,
         adapter=args.adapter,
+        mac_address=args.mac_address,
         target_uuids=args.target_uuids,
     )
 
