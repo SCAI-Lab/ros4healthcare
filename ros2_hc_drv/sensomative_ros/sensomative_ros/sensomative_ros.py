@@ -12,6 +12,7 @@ class SensomativeRos(Node):
         self,
         regex_pattern: str,
         adapter: str,
+        mac_address: Optional[str],
         target_uuids: List[str],
     ):
         super().__init__("sensomative")
@@ -19,6 +20,7 @@ class SensomativeRos(Node):
         self.bluetooth_connection_manager = BluetoothConnectionManager(
             pattern=regex_pattern,
             adapter=adapter,
+            mac_address=mac_address,
             target_uuids=target_uuids,
         )
         self.driver_context = self.bluetooth_connection_manager.__enter__()

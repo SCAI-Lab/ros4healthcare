@@ -29,10 +29,11 @@ def list_devices(proxy: ProxyObject, adapter: ProxyObject, rescan: bool, scan_ti
         if "org.bluez.Device1" in props
     }
 
-def find_first_matching_device(device_list: Dict[str, Any], pattern: Pattern) -> Optional[BluetoothDevice]:
+def find_first_matching_device(device_list: Dict[str, Any], pattern: Pattern, mac_address: Optional[str] = None) -> Optional[BluetoothDevice]:
     for path, props in device_list.items():
         name = props["org.bluez.Device1"].get("Name", "")
-        if pattern.match(name):
+        mac = props["org.bluez.Device1"].get("Address", "")
+        if pattern.match(name) and (mac_address is None or mac_address == mac):
             return BluetoothDevice(path=path, properties=props)
     return None
 

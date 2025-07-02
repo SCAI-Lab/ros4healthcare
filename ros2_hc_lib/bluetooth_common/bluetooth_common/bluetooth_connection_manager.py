@@ -19,17 +19,18 @@ class BluetoothConnectionError(RuntimeError):
     def __str__(self):
         return f"[BluetoothConnectionError] {self.args[0]}"
 
-
 class BluetoothConnectionManager:
     def __init__(
         self,
         pattern: re.Pattern,
         adapter: str,
+        mac_address: Optional[str] = None,
         target_uuids: Optional[List[str]] = None,
         reconnect_delay_s: int = 5,
     ):
         self.pattern = re.compile(pattern, re.IGNORECASE)
         self.adapter_name = adapter
+        self.mac = mac_address.upper() if mac_address is not None else None
         self.target_uuids = target_uuids
         self.reconnect_delay_s = reconnect_delay_s
 
@@ -123,7 +124,7 @@ class BluetoothConnectionManager:
                 device_list=list_devices(
                     proxy=self.manager, adapter=self.adapter, rescan=rescan
                 ),
-                pattern=self.pattern,
+                pattern=self.pattern, mac_address=self.mac
             )
             if device is None:
                 log.warning(
