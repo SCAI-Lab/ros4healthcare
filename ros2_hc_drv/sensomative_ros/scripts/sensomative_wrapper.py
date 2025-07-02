@@ -18,8 +18,8 @@ def main():
     parser.add_argument(
         "--mac-address",
         type=str,
-        default="CC:CC:CC:0A:39:73",
-        help="Mac Address of the device",
+        default=None,
+        help="MAC address of the device (optional)",
     )
     parser.add_argument(
         "--target-uuids",
