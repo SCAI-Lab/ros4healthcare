@@ -65,7 +65,6 @@ docopt==0.6.2
 docutils==0.16
 dulwich==0.19.15
 duplicity==0.8.12.0
-ecdsa==0.19.0
 empy==3.3.2
 entrypoints==0.3
 esptool==4.7.0
