@@ -1,0 +1,6 @@
+corsano_ros:
+  ros__parameters:
+    # mac_add: "C4:8D:E7:96:BD:AD"
+    mac_add: "D9:D9:DF:CB:74:79"
+    adapter_mac_add: "00:1A:7D:DA:71:12" # E4:5F:01:B1:87:D6
+    # adapter_mac_add: "E4:5F:01:B1:87:D6" # 

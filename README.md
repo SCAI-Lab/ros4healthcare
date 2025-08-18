@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="assets/ROS4HC Logo.png" width="550">
+<img src="assets/ROS4HC_Logo.png" width="550">
 </h1><br>
 
 # ROS4 Healthcare
@@ -9,18 +9,18 @@ Welcome to the **ROS4 Healthcare** project! This repository contains ROS2 packag
 
 ## Repository Structure
 
-- **`ros2_hc_drv`**: Includes drivers for various biosensors.
-- **`ros2_hc_examples`**: Example applications and use cases demonstration.
-- **`ros2_hc_lib`**: Libraries
-- **`ros2_hc_msgs`**: Contains all message definitions and structure for biosensor data.
-- **`ros2_hc_launch`**: Example launch files
-- **`ros2_hc_tools`**: Tools and utilities for development and operation.
+- **`ros4hc_drv`**: Includes drivers for various biosensors.
+- **`ros4hc_examples`**: Example applications and use cases demonstration.
+- **`ros4hc_lib`**: Libraries
+- **`ros4hc_msgs`**: Contains all message definitions and structure for biosensor data.
+- **`ros4hc_launch`**: Example launch files
+- **`ros4hc_tools`**: Tools and utilities for development and operation.
 
 
 
 ```
 ros4-healthcare
-├── ros2_hc_drv
+├── ros4hc_drv
 │   ├── mbient_ros
 │   │   ├── CMakeLists.txt
 │   │   ├── config
@@ -37,15 +37,15 @@ ros4-healthcare
 │       ├── launch
 │       ├── scripts
 │       └── corsano_ros
-├── ros2_hc_examples
+├── ros4hc_examples
 │   ├── applications
 │   │   ├── healthcare_wheelchair_dashboard
 │   │   └── topic_visualization
 │   └── nodes
 │       └── example_nodes
-├── ros2_hc_lib
+├── ros4hc_lib
 │   └── healthcare_adl_classifier
-├── ros2_hc_msgs
+├── ros4hc_msgs
 │   ├── msg
 │   │   ├── biometrics
 │   │   │   ├── behavioral
@@ -80,13 +80,13 @@ ros4-healthcare
 │   │   │   ├── external_signals
 │   │   │   │   ├── force
 │   │   │   │   └── pressure
-└── ros2_hc_launch
+└── ros4hc_launch
 │   ├── config
-│   │   └── ros2_hc_params.yaml
+│   │   └── ros4hc_params.yaml
 │   └── launch
-│   │   └── ros2_hc_launch.py
+│   │   └── ros4hc_launch.py
 │   └── README.md
-└── ros2_hc_tools
+└── ros4hc_tools
 ```
 ## Setup
 
@@ -107,16 +107,16 @@ cd ~/ros2_ws/src
 git clone --recurse-submodules git@github.com:SCAI-Lab/ros4healthcare.git
 cd ~/ros2_ws
 ```
-### **Build `ros2_hc_msgs`**
+### **Build `ros4hc_msgs`**
 ```bash
-colcon build --packages-select ros2_hc_msgs --symlink-install
+colcon build --packages-select ros4hc_msgs --symlink-install
 source install/setup.bash
 ```
 
 
 ## Running the Wrappers
 
-We have included wrappers for several devices in the `ros2_hc_drv` repository.
+We have included wrappers for several devices in the `ros4hc_drv` repository.
 
 Each wrapper receives either a device mac address or a file path as a parameter. Feel free to change the parameters in the respective config/params.yaml
 file for each device wrapper.
@@ -171,7 +171,7 @@ source install/setup.bash
 
 ## Running the Wrappers
 
-We have included wrappers for several devices in the `ros2_hc_drv` repository.
+We have included wrappers for several devices in the `ros4hc_drv` repository.
 
 Each wrapper receives either a device mac address or a file path as a parameter. Feel free to change the parameters in the respective config/params.yaml
 file for each device wrapper.
@@ -215,5 +215,5 @@ This work was partially supported by:
 - The ETH-SPS Digital Transformation in Personalized Health Care for SCI [Grant Number: 2021-HS-348]
 
 <h1 align="center">
-<img src="assets/Acknowledgement_JST_2.png" width="550">
+<img src="assets/Logo_JST.png" width="550">
 </h1><br>
