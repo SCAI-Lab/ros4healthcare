@@ -215,5 +215,5 @@ This work was partially supported by:
 - The ETH-SPS Digital Transformation in Personalized Health Care for SCI [Grant Number: 2021-HS-348]
 
 <h1 align="center">
-<img src="assets/Logo_JST.png" width="550">
+<img src="assets/JST_Logo.png" width="550">
 </h1><br>
