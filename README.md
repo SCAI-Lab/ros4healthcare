@@ -11,83 +11,11 @@ Welcome to the **ROS4Healthcare** project! This repository contains ROS2 package
 
 - **`ros4hc_drv`**: Includes drivers for various biosensors.
 - **`ros4hc_examples`**: Example applications and use cases demonstration.
-- **`ros4hc_lib`**: Libraries
-- **`ros4hc_msgs`**: Contains all message definitions and structure for biosensor data.
-- **`ros4hc_launch`**: Example launch files
-- **`ros4hc_tools`**: Tools and utilities for development and operation.
+- **`ros4hc_lib`**: Libraries.
+- **`ros4hc_msgs`**: Contains all message definitions and structure for sensor data.
+- **`ros4hc_launch`**: Example launch files.
+- **`ros4hc_devices`**: Buildable affordable devices that work with ROS4HC.
 
-
-
-```
-ros4-healthcare
-├── ros4hc_drv
-│   ├── mbient_ros
-│   │   ├── CMakeLists.txt
-│   │   ├── config
-│   │   ├── launch
-│   │   ├── mbient_ros
-│   │   └── scripts
-│   ├── sensomative_ros
-│   │   ├── config
-│   │   ├── launch
-│   │   ├── scripts
-│   │   └── sensomative_ros
-│   └── corsano_ros
-│       ├── config
-│       ├── launch
-│       ├── scripts
-│       └── corsano_ros
-├── ros4hc_examples
-│   ├── applications
-│   │   ├── healthcare_wheelchair_dashboard
-│   │   └── topic_visualization
-│   └── nodes
-│       └── example_nodes
-├── ros4hc_lib
-│   └── healthcare_adl_classifier
-├── ros4hc_msgs
-│   ├── msg
-│   │   ├── biometrics
-│   │   │   ├── behavioral
-│   │   │   │   └── mood
-│   │   │   ├── physiological
-│   │   │   │   ├── adl
-│   │   │   │   ├── gait
-│   │   │   │   └── posture
-│   │   ├── biosensing
-│   │   │   ├── derived_biosignals
-│   │   │   │   ├── co
-│   │   │   │   ├── hr
-│   │   │   │   ├── hrv
-│   │   │   │   ├── rr
-│   │   │   │   └── sv
-│   │   │   ├── raw_biosignals
-│   │   │   │   ├── bcg
-│   │   │   │   ├── ecg
-│   │   │   │   ├── eda
-│   │   │   │   ├── eeg
-│   │   │   │   ├── emg
-│   │   │   │   ├── eog
-│   │   │   │   ├── icg
-│   │   │   │   └── ppg
-│   │   ├── physical_sensors
-│   │   │   ├── derived_signals
-│   │   │   │   ├── elevation_angle
-│   │   │   │   ├── joint_angles
-│   │   │   │   ├── joint_angular_velocity
-│   │   │   │   ├── pose
-│   │   │   │   └── steps
-│   │   │   ├── external_signals
-│   │   │   │   ├── force
-│   │   │   │   └── pressure
-└── ros4hc_launch
-│   ├── config
-│   │   └── ros4hc_params.yaml
-│   └── launch
-│   │   └── ros4hc_launch.py
-│   └── README.md
-└── ros4hc_tools
-```
 ## Setup
 
 ## **Prerequisites**
