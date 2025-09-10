@@ -1,0 +1,6 @@
+[submodule "ros4hc_lib/hc_adl_classifier"]
+	path = ros4hc_lib/hc_adl_classifier
+	url = https://github.com/SCAI-Lab/healthcare_adl_classifier.git
+[submodule "ros4hc_drv/MR60HA_mmWave"]
+	path = ros4hc_drv/MR60BHA1_mmWave
+	url = https://github.com/ricardo-manriquez/mmWave
