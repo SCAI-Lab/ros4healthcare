@@ -2,9 +2,9 @@
 <img src="assets/ROS4HC_Logo.png" width="550">
 </h1><br>
 
-# ROS4 Healthcare
+# ROS4Healthcare
 
-Welcome to the **ROS4 Healthcare** project! This repository contains ROS2 packages for healthcare applications, including message definitions, drivers, libraries, tools, and examples. **`ros4hc`** serves as an example of how one can use biosignals coming from wearable medical devices like Vivalink and mbient wristbands to track patients' activities. In addition, we have developed an Activities of Daily Living (ADL) classifier that will help doctors visualize their patients' daily activity patterns and consequently help them recommend a suitable routine. This can be visualised through our `healthcare_wheelchair_dashboard`.
+Welcome to the **ROS4Healthcare** project! This repository contains ROS2 packages for healthcare applications, including message definitions, drivers, libraries, tools, and examples. **`ros4hc`** serves as an example of how one can use biosignals coming from wearable medical devices like Vivalink and mbient wristbands to track patients' activities. In addition, we have developed an Activities of Daily Living (ADL) classifier that will help doctors visualize their patients' daily activity patterns and consequently help them recommend a suitable routine. This can be visualised through our `healthcare_wheelchair_dashboard`.
 
 
 ## Repository Structure
@@ -104,24 +104,23 @@ Now clone the repo into our workspace
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros4healthcare.git
-cd ~/ros2_ws
+git clone --recurse-submodules https://github.com/ricardo-manriquez/ros4healthcare
+cd ~/ros4healthcare
 ```
-### **Build `ros4hc_msgs`**
+### **Build `ros4hc_msgs` and `ros4hc_drv`**
 ```bash
-colcon build --packages-select ros4hc_msgs --symlink-install
+colcon build --packages-select ros4hc_msgs ros4hc_drv --symlink-install
 source install/setup.bash
 ```
 
+## Running the Drivers
 
-## Running the Wrappers
+We have included drivers for several devices in the `ros4hc_drv` repository.
 
-We have included wrappers for several devices in the `ros4hc_drv` repository.
+Each driver receives either a device mac address or a file path as a parameter. Feel free to change the parameters in the respective config/params.yaml
+file for each device driver.
 
-Each wrapper receives either a device mac address or a file path as a parameter. Feel free to change the parameters in the respective config/params.yaml
-file for each device wrapper.
-
-To run the wrappers for BLE devices, make sure the PC Bluetooth is on, the device is charged and is nearby, then run the wrapper
+To run the driver for BLE devices, make sure the PC Bluetooth is on, the device is charged and is nearby, then run the driver
 
 by running ```ros2 launch package_name launch_file```  
 
@@ -159,7 +158,7 @@ We then need to clone the repositories into our workspace
 
 ```bash
 cd ros2_ws/src
-git clone --recurse-submodules git@github.com:SCAI-Lab/ros4healthcare.git
+git clone --recurse-submodules https://github.com/ricardo-manriquez/ros4healthcare
 cd ..
 ```
 then build and source the workspace 
@@ -168,42 +167,6 @@ then build and source the workspace
 colcon build --symlink-install
 source install/setup.bash
 ```
-
-## Running the Wrappers
-
-We have included wrappers for several devices in the `ros4hc_drv` repository.
-
-Each wrapper receives either a device mac address or a file path as a parameter. Feel free to change the parameters in the respective config/params.yaml
-file for each device wrapper.
-
-To run the wrappers for BLE devices, make sure the PC Bluetooth is on, the device is charged and is nearby, then run the wrapper
-
-by running ```ros2 launch package_name launch_file```  
-
-To run our dashboard, we will need to connect to the mbient sensor and to the sensomative mat, for this run:
-
-```
-ros2 launch mbient_ros mbient_node.launch.py
-```
-
-in a new terminal, source the repo and run the sensomative launch file
-
-```
-source install/setup.bash
-ros2 launch sensomative_ros sensomative_node.launch.py
-```
-
-## Running ADL Classifier 
-
-In order to have our model classify the data coming from the wearable devices, we need to run the healthcare_adl_classifier
-
-To do this open a new tab, source the repo and run
-
-```
-source install/setup.bash
-ros2 run healthcare_adl_classifier pub_adl
-```
-
 
 # Acknowledgments
 
