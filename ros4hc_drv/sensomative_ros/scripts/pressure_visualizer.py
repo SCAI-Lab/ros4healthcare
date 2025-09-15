@@ -37,9 +37,6 @@ class PressureVisualiser(Node):
 
         self.img_pub = self.create_publisher(Image, self.output_topic, 10)
 
-        #self.pub_pressure_img = self.create_publisher(Image, self.output_topic, 10)
-        #self.timer = self.create_timer(0.1, self.timer_callback)
-
         self.get_logger().info('Pressure Visualiser Node Running')
 
     def pressure_callback(self, msg):
@@ -75,57 +72,6 @@ class PressureVisualiser(Node):
 
         msg.header.stamp = self.get_clock().now().to_msg()
         self.img_pub.publish(msg)
-
-    def timer_callback(self):
-        smoothed_pressure = self.create_smooth_heatmap()
-
-        smoothed_pressure = np.flipud(smoothed_pressure)
-
-        zmin = np.nanmin(smoothed_pressure)
-        zmax = np.nanmax(smoothed_pressure)
-        if zmin == zmax:
-            zmax = zmin + 1e-5
-
-        fig = go.Figure(data=go.Heatmap(
-            z=smoothed_pressure,
-            colorscale='Turbo',
-            zmin=zmin,
-            zmax=zmax,
-            hoverongaps=False,
-            showscale=True
-        ))
-
-        fig.add_annotation(
-            text="REAR",
-            x=0.5, y=0.05,
-            xref="paper", yref="paper",
-            showarrow=False,
-            font=dict(size=25, color="black", family="Arial Black"),
-            opacity=0.8
-        )
-
-
-        fig.update_layout(
-            width=600,
-            height=600,
-            margin=dict(l=10, r=10, t=10, b=10),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-
-        try:
-            img_bytes = fig.to_image(format="png")
-        except Exception as e:
-            self.get_logger().error(f"Plotly image export failed: {e}")
-            return
-
-        img_array = np.frombuffer(img_bytes, dtype=np.uint8)
-        cv_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
-        msg = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
-        self.pub_pressure_img.publish(msg)
-
-
 
 def main(args=None):
     rclpy.init(args=args)
