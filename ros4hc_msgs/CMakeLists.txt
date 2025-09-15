@@ -12,16 +12,11 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 # Recursively collect all .msg files
-file(GLOB_RECURSE msg_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "msg/**/*.msg")
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files}
-  DEPENDENCIES std_msgs builtin_interfaces
-)
+file(GLOB_RECURSE msg_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.msg")
+message(STATUS "Found message files: ${msg_files}")
 
 # Generate ROS interfaces
-rosidl_generate_interfaces(
-  ${PROJECT_NAME}
+rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   DEPENDENCIES builtin_interfaces std_msgs geometry_msgs
 )
@@ -34,12 +29,12 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(
-  DIRECTORY msg
-  DESTINATION share/${PROJECT_NAME}
-)
+#install(
+#  DIRECTORY msg
+#  DESTINATION share/${PROJECT_NAME}
+#)
 
-set(LD_LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
+#set(LD_LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
 
 # Install package metadata
 ament_package()

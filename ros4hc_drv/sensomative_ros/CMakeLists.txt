@@ -25,12 +25,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # Install Python executables
 install(PROGRAMS
-  scripts/sensomative_wrapper.py
-  scripts/pressure_visualizer.py  
-  DESTINATION lib/${PROJECT_NAME}
-)
-# Install Python executables
-install(PROGRAMS
+  scripts/sensomative.py
   scripts/pressure_visualizer.py
   DESTINATION lib/${PROJECT_NAME}
 )

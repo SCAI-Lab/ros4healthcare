@@ -1,6 +1,5 @@
 from rclpy.node import Node
-from ros4hc_msgs.msg._pressure import Pressure
-from ros4hc_msgs.msg._pressure_header import PressureHeader
+from ros4hc_msgs.msg import PressureMat
 from std_msgs.msg import Header
 from typing import List, Optional
 
@@ -26,7 +25,7 @@ class SensomativeRos(Node):
         self.driver_context = self.bluetooth_connection_manager.__enter__()
         self.driver = self.driver_context
 
-        self.publisher_ = self.create_publisher(Pressure, "pressure1", 10)
+        self.publisher_ = self.create_publisher(PressureMat, "pressure1", 10)
 
         timer_period = 0.1  # Frequency of the sampling
         self.timer = self.create_timer(timer_period, self.timer_callback)
@@ -43,23 +42,19 @@ class SensomativeRos(Node):
             return
         data = self.driver.get_data()
         if data is not None:
-            msg = Pressure()
-            msg.header = PressureHeader()
-            msg.header.header = Header()
-            msg.header.header.stamp = self.get_clock().now().to_msg()
-            msg.header.device_serial_number = str(self.mac_address)
-            msg.header.unit = "Pa"
-            msg.header.sampling_frequency = 10
-            msg.header.resolution = 1.0
-            msg.header.accuracy = 0.95
-            msg.header.max_range = 65535.0
-            msg.header.min_range = 0.0
-            msg.header.rows = 3
-            msg.header.cols = 4
-            msg.pressure = [int(max(0, min(65535, x))) for x in data[0:12]]
-            msg.header.rows = 3
-            msg.header.cols = 4
-            msg.header.header.stamp = self.get_clock().now().to_msg()
+            msg = PressureMat()
+            msg.header = Header()
+            msg.header.stamp = self.get_clock().now().to_msg()
+#            msg.header.device_serial_number = str(self.mac_address)
+#            msg.header.unit = "Pa"
+#            msg.header.sampling_frequency = 10
+#            msg.header.resolution = 1.0
+#            msg.header.accuracy = 0.95
+#            msg.header.max_range = 65535.0
+#            msg.header.min_range = 0.0
+            msg.rows = 3
+            msg.cols = 4
+            msg.pressures = [int(max(0, min(65535, x))) for x in data[0:12]]
 
             self.publisher_.publish(msg)
 

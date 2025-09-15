@@ -15,7 +15,7 @@ def generate_launch_description():
     sensomative_node = Node(
         package='sensomative_ros',
         name='sensomative_ros',
-        executable='sensomative_wrapper.py',
+        executable='sensomative.py',
         parameters=[config],
         output='screen'
     )

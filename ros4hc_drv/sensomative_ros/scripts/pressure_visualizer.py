@@ -4,12 +4,12 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from cv_bridge import CvBridge
+import matplotlib.pyplot as plt
 from sensor_msgs.msg import Image
-from ros4hc_msgs.msg import Pressure
-import plotly.graph_objects as go
+from ros4hc_msgs.msg import PressureMat
+from io import BytesIO
+from PIL import Image as Im
 import cv2
-from scipy.ndimage import gaussian_filter
-from scipy.interpolate import griddata
 
 class PressureVisualiser(Node):
 
@@ -18,8 +18,8 @@ class PressureVisualiser(Node):
 
         self.declare_parameter('input_topic', '/pressure1')
         self.declare_parameter('output_topic', '/pressure_visualiser')
-        self.declare_parameter('array_width', 50)  
-        self.declare_parameter('array_height', 50)  
+        self.declare_parameter('array_width', 50)
+        self.declare_parameter('array_height', 50)
         self.declare_parameter('debug_mode', False)
         self.declare_parameter('smoothing_sigma', 3.0)
 
@@ -30,48 +30,61 @@ class PressureVisualiser(Node):
         self.debug_mode = self.get_parameter('debug_mode').get_parameter_value().bool_value
         self.smoothing_sigma = self.get_parameter('smoothing_sigma').get_parameter_value().double_value
 
-        self.pressure = [0 for _ in range(12)]
+        self.pressures = [0 for _ in range(12)]
         self.bridge = CvBridge()
 
-        self.sub_pressure = self.create_subscription(Pressure, self.input_topic, self.pressure_callback, 10)
-        self.pub_pressure_img = self.create_publisher(Image, self.output_topic, 10)
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.sub_pressure = self.create_subscription(PressureMat, self.input_topic, self.pressure_callback, 10)
+
+        self.img_pub = self.create_publisher(Image, self.output_topic, 10)
+
+        #self.pub_pressure_img = self.create_publisher(Image, self.output_topic, 10)
+        #self.timer = self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info('Pressure Visualiser Node Running')
 
     def pressure_callback(self, msg):
-        self.pressure = msg.pressure
+        col_indices = np.array([0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3])
+        row_indices = np.array([0, 1, 2, 3, 4, 4, 4, 4, 3, 2, 1, 0])
+        grid = np.zeros((5, 4), dtype=np.uint8)
+        grid[row_indices, col_indices] = msg.pressures
 
-    def create_smooth_heatmap(self):
-        points = np.array([
-            [0, 0], [20, 20], [40, 0], [60, 30],
-            [90, 0], [90, 30], [90, 60], [90, 90],
-            [60, 60], [40, 90], [20, 70], [0, 90]
-        ])
-        
-        values = np.array(self.pressure)
+        res = 600
 
-        grid_x, grid_y = np.mgrid[0:100:complex(0, self.array_width), 
-                                   0:100:complex(0, self.array_height)]
+        fig, ax = plt.subplots(figsize=(6, 6), dpi=res/6)
 
-        grid_z = griddata(points, values, (grid_x, grid_y), method='cubic')
+        ax.set_position([0, 0, 1, 1])
+        fig.text(0.5, 0.95, 'FRONT', ha='center', va='center', fontsize=16, color='white', fontweight='bold')
+        ax.set_facecolor('black')
+        fig.patch.set_facecolor('black')
 
-        nan_mask = np.isnan(grid_z)
-        grid_z[nan_mask] = griddata(points, values, (grid_x[nan_mask], grid_y[nan_mask]), method='nearest')
+        ax.axis('off')
 
-        smoothed = gaussian_filter(grid_z, sigma=self.smoothing_sigma)
+        ax.imshow(grid, interpolation="gaussian", cmap="turbo", vmin=0, vmax=255, aspect='auto')
+        fig.canvas.draw()
 
-        return smoothed
+        width, height = fig.canvas.get_width_height()
+        rgb_buffer = fig.canvas.tostring_rgb()
+
+        numpy_img_rgb = np.frombuffer(rgb_buffer, dtype=np.uint8).reshape(height, width, 3)
+
+        plt.close(fig)
+
+        numpy_img_bgr = cv2.cvtColor(numpy_img_rgb, cv2.COLOR_RGB2BGR)
+
+        msg = self.bridge.cv2_to_imgmsg(numpy_img_bgr, "bgr8")
+
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.img_pub.publish(msg)
 
     def timer_callback(self):
         smoothed_pressure = self.create_smooth_heatmap()
 
-        smoothed_pressure = np.flipud(smoothed_pressure)  
+        smoothed_pressure = np.flipud(smoothed_pressure)
 
         zmin = np.nanmin(smoothed_pressure)
         zmax = np.nanmax(smoothed_pressure)
         if zmin == zmax:
-            zmax = zmin + 1e-5  
+            zmax = zmin + 1e-5
 
         fig = go.Figure(data=go.Heatmap(
             z=smoothed_pressure,
@@ -83,19 +96,19 @@ class PressureVisualiser(Node):
         ))
 
         fig.add_annotation(
-            text="REAR",  
-            x=0.5, y=0.05,  
+            text="REAR",
+            x=0.5, y=0.05,
             xref="paper", yref="paper",
             showarrow=False,
-            font=dict(size=25, color="black", family="Arial Black"), 
-            opacity=0.8 
+            font=dict(size=25, color="black", family="Arial Black"),
+            opacity=0.8
         )
 
 
         fig.update_layout(
             width=600,
             height=600,
-            margin=dict(l=10, r=10, t=10, b=10),  
+            margin=dict(l=10, r=10, t=10, b=10),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )
