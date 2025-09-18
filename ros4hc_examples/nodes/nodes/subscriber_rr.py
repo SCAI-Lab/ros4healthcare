@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from ros_healthcare_msg.msg import RR
+from ros4hc_msgs.msg import RR
 
 
 class RRSubscriber(Node):

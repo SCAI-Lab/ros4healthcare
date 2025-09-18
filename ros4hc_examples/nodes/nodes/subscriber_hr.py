@@ -2,7 +2,7 @@
 
 import rclpy
 
-from ros_healthcare_msg.msg import HR
+from ros4hc_msgs.msg import HR
 
 
 class Subscriber_hr(rclpy.node.Node):

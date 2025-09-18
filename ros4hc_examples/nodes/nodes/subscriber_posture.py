@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from ros_healthcare_msg.msg import Posture
+from ros4hc_msgs.msg import Posture
 
 
 class PostureSubscriber(Node):

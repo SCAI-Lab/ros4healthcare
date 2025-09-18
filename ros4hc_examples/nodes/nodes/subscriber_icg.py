@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from ros_healthcare_msg.msg import ICGLeads
+from ros4hc_msgs.msg import ICGLeads
 
 
 class ICGSubscriber(Node):

@@ -2,7 +2,7 @@
 
 import rclpy
 
-from ros_healthcare_msg.msg import EDA
+from ros4hc_msgs.msg import EDA
 
 
 class EDASubscriber(rclpy.node.Node):

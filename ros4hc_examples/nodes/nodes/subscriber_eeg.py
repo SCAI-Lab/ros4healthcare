@@ -2,7 +2,7 @@
 
 import rclpy
 
-from ros_healthcare_msg.msg import EEGchannels
+from ros4hc_msgs.msg import EEGchannels
 
 
 class EEGSubscriber(rclpy.node.Node):

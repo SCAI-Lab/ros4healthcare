@@ -2,7 +2,7 @@
 
 import rclpy
 
-from ros_healthcare_msg.msg import ECGLeads
+from ros4hc_msgs.msg import ECGLeads
 
 
 class ECGSubscriber(rclpy.node.Node):

@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from ros_healthcare_msg.msg import PPG
+from ros4hc_msgs.msg import PPG
 
 
 class Subscriber_ppg(Node):
