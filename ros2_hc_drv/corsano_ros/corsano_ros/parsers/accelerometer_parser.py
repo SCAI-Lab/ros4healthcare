@@ -1,9 +1,9 @@
 from __future__ import annotations
-from logging import info, warning, error
-import numpy as np
+from logging import warning
 from dataclasses import dataclass
 from datetime import timezone
 from typing import Optional, Tuple
+import numpy as np
 
 
 @dataclass
@@ -21,6 +21,7 @@ class AccelerometerData:
         z_values: Array of Z-axis accelerometer readings (m/s²).
         timestamp_ms: Timestamp of the first sample in milliseconds.
     """
+
     index: int
     quality: int
     bpi: int
@@ -69,7 +70,10 @@ class AccelerometerParser:
             or None otherwise.
         """
         if metric_id != 0x2B:
-            warning(f"[AccelerometerParser] Skipping unsupported metric ID: 0x{metric_id:02X} ({metric_id})")
+            warning(
+                f"[AccelerometerParser] Skipping unsupported metric ID: "
+                f"0x{metric_id:02X} ({metric_id})"
+            )
             return None
 
         return self._process_acc(metric_array, processed_index, metric_size)
@@ -81,7 +85,6 @@ class AccelerometerParser:
         metric_size: int
     ) -> Tuple[int, AccelerometerData]:
         """Decode an accelerometer metric packet into structured data."""
-
         # --- Parse 4-byte header ---
         index = metric_array[processed_index]
         quality = metric_array[processed_index + 1]
@@ -93,7 +96,10 @@ class AccelerometerParser:
         if self.last_index is not None:
             expected = (self.last_index + 1) % 256
             if index != expected:
-                warning(f"[AccelerometerParser]  Packet drop detected: expected {expected}, got {index}")
+                warning(
+                    f"[AccelerometerParser] Packet drop detected: "
+                    f"expected {expected}, got {index}"
+                )
         self.last_index = index
 
         # --- Number of samples ---
@@ -109,17 +115,17 @@ class AccelerometerParser:
             x_values[i] = int.from_bytes(
                 metric_array[processed_index:processed_index + 2],
                 byteorder="little",
-                signed=True
+                signed=True,
             ) * scale
             y_values[i] = int.from_bytes(
                 metric_array[processed_index + 2:processed_index + 4],
                 byteorder="little",
-                signed=True
+                signed=True,
             ) * scale
             z_values[i] = int.from_bytes(
                 metric_array[processed_index + 4:processed_index + 6],
                 byteorder="little",
-                signed=True
+                signed=True,
             ) * scale
             processed_index += 6
 
@@ -132,8 +138,9 @@ class AccelerometerParser:
             x_values=x_values,
             y_values=y_values,
             z_values=z_values,
-            timestamp_ms=self.acc_time
+            timestamp_ms=self.acc_time,
         )
+
         # Update timestamp
         self.acc_time += num_samples * 1000.0 / self.ACC_SR
         return data

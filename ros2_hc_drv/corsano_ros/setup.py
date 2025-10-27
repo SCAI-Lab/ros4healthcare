@@ -23,7 +23,7 @@ setup(
     license='Apache License 2.0',
     entry_points={
         'console_scripts': [
-            'corsano_ros = corsano_ros.corsano_wrapper:main',
+            'corsano_ros = corsano_ros.corsano_ros_wrapper:main',
         ],
     },
 )

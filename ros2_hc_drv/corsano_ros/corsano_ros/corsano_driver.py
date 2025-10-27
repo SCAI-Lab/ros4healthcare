@@ -1,31 +1,51 @@
+from __future__ import annotations
 import io
-from logging import debug, error, info, warning
 import time
 import subprocess
 import threading
+from logging import debug, error, info, warning
+
 import simplepyble
-from corsano_ros.commands import commands, APP_CMD_SET_PLAN, FW_SET_WAKE_UP, CMD_UNKNOWN
+
+from corsano_ros.commands import (
+    commands,
+    APP_CMD_SET_PLAN,
+    FW_SET_WAKE_UP,
+    CMD_UNKNOWN,
+)
 from corsano_ros.corsano_enums import PLAN, PLAN_FREQUENCY, check_crc
 from corsano_ros.helpers import is_mac_address
 
+# -------------------------------------------------------------------------
+# BLE UUID Constants
+# -------------------------------------------------------------------------
 CORSANO_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca3e"
 WRITE_CHAR = "6e400002-b5a3-f393-e0a9-e50e24dcca3e"
 FILE_RX_CHAR = "6e400003-b5a3-f393-e0a9-e50e24dcca3e"
 COMMAND_RX_CHAR = "6e400004-b5a3-f393-e0a9-e50e24dcca3e"
 
+
 class CorsanoDriver:
     """
     High-level BLE interface to a Corsano device.
-    Supports MAC or device-name scanning.
+
+    Supports both MAC and name-based scanning.
     Fully context-manager-compatible.
     """
 
-    def __init__(self, name_or_address: str, adapter_name: str, auto_reconnect: bool = True, reconnect_interval: float = 5.0):
+    def __init__(
+        self,
+        name_or_address: str,
+        adapter_name: str,
+        auto_reconnect: bool = True,
+        reconnect_interval: float = 5.0,
+    ):
+        # Adapter and connection state
         self.adapter_name = adapter_name
-        self.peripheral = None
         self.adapter = self._get_adapter_by_name(adapter_name)
+        self.peripheral = None
 
-        # Connection / command attributes
+        # Communication and parsing attributes
         self.ping = None
         self.commands = {}
         self.stack = {}
@@ -33,6 +53,8 @@ class CorsanoDriver:
         self._start_tx = False
         self.hash_func = check_crc
         self.connected = False
+
+        # Threading and reconnection management
         self._connected_event = threading.Event()
         self._reconnect_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -40,7 +62,7 @@ class CorsanoDriver:
         self._reconnect_interval = reconnect_interval
         self._monitor_thread = None
 
-        # Resolve device address
+        # Resolve address from name or direct MAC
         if is_mac_address(name_or_address):
             self.address = name_or_address
         else:
@@ -50,17 +72,20 @@ class CorsanoDriver:
         if not self.address:
             raise RuntimeError("[CorsanoDriver] No device address provided or found.")
 
-        # Initialize commands & HCI reset
+        # Initialize HCI reset command and available commands
         self._init_hci_reset()
         self._init_commands()
 
-        # Connect
+        # Connect and optionally start monitoring
         self.connect()
         if self._auto_reconnect:
             self._start_monitor_thread()
 
-    # ---------------- Initialization Helpers ----------------
+    # ---------------------------------------------------------------------
+    # Initialization Helpers
+    # ---------------------------------------------------------------------
     def _get_adapter_by_name(self, adapter_name: str):
+        """Return a SimplePyBLE adapter instance matching the given name."""
         for adapter in simplepyble.Adapter.get_adapters():
             if adapter.identifier() == adapter_name:
                 info(f"[CorsanoDriver] Using adapter: {adapter.identifier()} ({adapter.address()})")
@@ -70,8 +95,6 @@ class CorsanoDriver:
     def _find_device_by_name(self, prefix: str = "287-2B", timeout_ms: int = 5000) -> str:
         """Scan for nearby BLE devices and return address of first match by name prefix."""
         info(f"[CorsanoDriver] Scanning for BLE devices (prefix='{prefix}')...")
-
-        # Perform initial scan
         self.adapter.scan_for(timeout_ms)
         results = self.adapter.scan_get_results()
 
@@ -83,10 +106,9 @@ class CorsanoDriver:
                 return addr
 
         warning(f"[CorsanoDriver] No device found starting with '{prefix}', trying extended scan...")
-
-        # Optional extended scan
         self.adapter.scan_for(timeout_ms * 2)
         results = self.adapter.scan_get_results()
+
         for device in results:
             name = device.identifier() or device.address()
             if name.startswith(prefix):
@@ -94,26 +116,30 @@ class CorsanoDriver:
                 info(f"[CorsanoDriver] Found matching device: {name} ({addr})")
                 return addr
 
-        error(f"[CorsanoDriver] Device with prefix '{prefix}' not found after forced rescan.")
+        error(f"[CorsanoDriver] Device with prefix '{prefix}' not found after rescan.")
         return None
 
-
     def _init_hci_reset(self):
+        """Prepare shell command for resetting the HCI adapter."""
         self.hci_reset_command = f"echo scai | sudo hciconfig {self.adapter_name} reset"
 
     def _init_commands(self):
+        """Load available command definitions."""
         for cmd in commands:
             self.commands[cmd.cmd] = cmd()
 
-    # ---------------- Connection ----------------
+    # ---------------------------------------------------------------------
+    # Connection Handling
+    # ---------------------------------------------------------------------
     def connect(self, max_retries: int = 10) -> bool:
+        """Attempt to connect to the target device."""
         if not self.adapter:
             return False
 
         info(f"[CorsanoDriver] Connecting to {self.address}...")
-
         peripherals = self.adapter.get_paired_peripherals()
         retries = max_retries
+
         while retries > 0 and self.address not in [p.address() for p in peripherals]:
             info(f"Searching for device... ({max_retries - retries + 1}/{max_retries})")
             self.adapter.scan_for(3000)
@@ -143,6 +169,7 @@ class CorsanoDriver:
         return True
 
     def _start_monitor_thread(self):
+        """Start background thread to automatically reconnect if disconnected."""
         def monitor():
             while not self._stop_event.is_set():
                 time.sleep(self._reconnect_interval)
@@ -150,10 +177,12 @@ class CorsanoDriver:
                     warning("[CorsanoDriver] Device disconnected. Reconnecting...")
                     self.connected = False
                     self._attempt_reconnect()
+
         self._monitor_thread = threading.Thread(target=monitor, daemon=True)
         self._monitor_thread.start()
 
     def _attempt_reconnect(self):
+        """Attempt to re-establish BLE connection after disconnection."""
         with self._reconnect_lock:
             self._connected_event.clear()
             try:
@@ -166,13 +195,17 @@ class CorsanoDriver:
                 error(f"[CorsanoDriver] Reconnect failed: {e}")
                 self._attempt_reconnect()
 
-    # ---------------- Event Handlers ----------------
+    # ---------------------------------------------------------------------
+    # Event Handlers
+    # ---------------------------------------------------------------------
     def _on_file_data(self, data: bytes):
+        """Callback invoked when file data is received."""
         if self.buffer:
             self._start_tx = True
             self.buffer.write(data)
 
     def _on_command_data(self, data: bytes):
+        """Callback invoked when command data is received."""
         if self.hash_func(data) != 0:
             error("[CorsanoDriver] CRC check failed")
             return
@@ -198,10 +231,15 @@ class CorsanoDriver:
             error(f"[CorsanoDriver] Error processing command {cmd_id}: {e}")
             error(traceback.format_exc())
 
+    # ---------------------------------------------------------------------
+    # Command Execution
+    # ---------------------------------------------------------------------
     def execute(self, cmd_id, *args, **kwargs):
+        """Execute a command on the connected device."""
         if not self.connected:
             warning("[CorsanoDriver] Cannot execute command because the device is not connected.")
             return
+
         cmd = self.commands[cmd_id]
         debug(f"[CorsanoDriver] Executing command {cmd}")
 
@@ -225,34 +263,38 @@ class CorsanoDriver:
         return
 
     def set_max_act_plan(self):
+        """Set maximum activity plan configuration on device."""
         return self.execute(
             APP_CMD_SET_PLAN.cmd,
             plan=PLAN.HOSPITAL_MULTICOLOR,
-            ppgfreq=PLAN_FREQUENCY['FREQ_512HZ'],
+            ppgfreq=PLAN_FREQUENCY["FREQ_512HZ"],
             actfreq=1,
         )
 
     def get_buffer(self):
+        """Return and reset the internal transmission buffer."""
         if self.buffer:
             self.buffer.flush()
             self.buffer.seek(0)
             return self.buffer
 
     def write(self, data: bytes):
+        """Write raw bytes directly to the device."""
         if not self.peripheral or not self.peripheral.is_connected():
             error("Device not connected")
             return
         self.peripheral.write_command(CORSANO_SERVICE, WRITE_CHAR, data)
 
-    # ---------------- Context Management ----------------
+    # ---------------------------------------------------------------------
+    # Context Management
+    # ---------------------------------------------------------------------
     def __enter__(self):
         if not self.peripheral or not self.peripheral.is_connected():
             if not self.connect():
                 raise RuntimeError("Failed to connect to Corsano device")
-            return
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         self._stop_event.set()
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=2)

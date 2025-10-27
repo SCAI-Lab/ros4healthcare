@@ -1,8 +1,9 @@
 from __future__ import annotations
-from logging import info, error, warning, debug
+
 import math
 from dataclasses import dataclass
 from datetime import timezone
+from logging import debug, error, warning
 from typing import Optional
 import numpy as np
 
@@ -44,11 +45,7 @@ class BioZParser:
 
     BIOZ_SR = 25  # Sampling rate in Hz
 
-    def __init__(
-        self,
-        time_zone=timezone.utc,
-        normalize: bool = False,
-    ):
+    def __init__(self, time_zone=timezone.utc, normalize: bool = False):
         """
         Args:
             time_zone: Time zone for timestamping (default: UTC).
@@ -57,7 +54,11 @@ class BioZParser:
         self.bioz_time = 0.0
         self.time_zone = time_zone
         self.normalize = normalize
-        self.last_index = None
+        self.last_index: Optional[int] = None
+
+    # -------------------------------------------------------------------------
+    # Metric array processing
+    # -------------------------------------------------------------------------
 
     def process_metric_array(
         self,
@@ -70,11 +71,12 @@ class BioZParser:
         Dispatch parsing based on metric ID and payload size.
 
         Returns:
-            Updated processed_index after this metric has been handled.
+            BioZData object or None if unsupported metric.
         """
         if metric_id not in (0x3D, 0x3E):
-            error(f"[Info] Skipping unsupported metric ID: 0x{metric_id:02X}")
+            error(f"[BioZParser] Skipping unsupported metric ID: 0x{metric_id:02X}")
             return None
+
         if metric_size >= 154:
             return self._process_bioz_adc(metric_array, processed_index, metric_size)
         return self._process_bioz(metric_array, processed_index, metric_size)
@@ -82,12 +84,18 @@ class BioZParser:
     # -------------------------------------------------------------------------
     # Standard 3-byte BioZ samples
     # -------------------------------------------------------------------------
-    def _process_bioz(self, metric_array: bytes, processed_index: int, metric_size: int) -> int:
+
+    def _process_bioz(
+        self,
+        metric_array: bytes,
+        processed_index: int,
+        metric_size: int,
+    ) -> BioZData:
+        """Process standard BioZ samples."""
         debug("[BioZParser] Processing standard BioZ samples")
 
         # Skip 4-byte header (index, quality, BPI, format)
         processed_index += 4
-
         no_samples = math.floor((metric_size - 4) / 3)
         raw_values = np.empty(no_samples, dtype=np.int32)
 
@@ -103,20 +111,19 @@ class BioZParser:
 
         normalized = None
         if self.normalize:
-            normalized = (raw_values + 8388608) / 16777216.0
+            normalized = (raw_values + 8_388_608) / 16_777_216.0
 
-        # Optional callback
         bioz = BioZData(
-                timestamp_ms=self.bioz_time,
-                record_index=-1,
-                quality=-1,
-                bpi=-1,
-                biozf=-1,
-                bioz_raw=raw_values,
-                adc_values=np.empty(0, dtype=np.int32),
-                eda_us=np.empty(0, dtype=float),
-                normalized_bioz=normalized,
-            )
+            timestamp_ms=self.bioz_time,
+            record_index=-1,
+            quality=-1,
+            bpi=-1,
+            biozf=-1,
+            bioz_raw=raw_values,
+            adc_values=np.empty(0, dtype=np.int32),
+            eda_us=np.empty(0, dtype=float),
+            normalized_bioz=normalized,
+        )
 
         self.bioz_time += no_samples * 1000 / self.BIOZ_SR
         return bioz
@@ -124,7 +131,14 @@ class BioZParser:
     # -------------------------------------------------------------------------
     # Extended BioZ + ADC format (6-byte samples)
     # -------------------------------------------------------------------------
-    def _process_bioz_adc(self, metric_array: bytes, processed_index: int, metric_size: int) -> int:
+
+    def _process_bioz_adc(
+        self,
+        metric_array: bytes,
+        processed_index: int,
+        metric_size: int,
+    ) -> BioZData:
+        """Process extended BioZ + ADC samples."""
         debug("[BioZParser] Processing BioZ + ADC samples")
 
         # Header: [index, quality, bpi, biozf]
@@ -165,7 +179,7 @@ class BioZParser:
 
         normalized = None
         if self.normalize:
-            normalized = (raw_values + 8388608) / 16777216.0
+            normalized = (raw_values + 8_388_608) / 16_777_216.0
 
         bioz = BioZData(
             timestamp_ms=self.bioz_time,
@@ -178,8 +192,13 @@ class BioZParser:
             eda_us=eda_values,
             normalized_bioz=normalized,
         )
+
         self.bioz_time += no_samples * 1000 / self.BIOZ_SR
         return bioz
+
+    # -------------------------------------------------------------------------
+    # Utility
+    # -------------------------------------------------------------------------
 
     def reset(self) -> None:
         """Reset parser timestamp and last index."""
