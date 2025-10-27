@@ -1,5 +1,5 @@
-from enum import Enum
 import crcmod
+from enum import Enum, IntEnum
 
 check_crc = crcmod.mkCrcFun(0x107, 0xff, False, 0)
 
@@ -44,15 +44,19 @@ class CHG_STATUS(Enum):
     IN_CHARGER_CHARGING        = 3
     NOT_IN_CHARGER_CHARGING    = 4
 
-class PLAN(Enum):
-    MAX_BATTERY        = 1
-    TYPICAL            = 2
-    HIGH_RESOLUTION    = 3
-    HOSPITAL_NIGHTS    = 4
-    HOSPITAL_FULL      = 5
-    DEFAULT            = 7
-    HIGH_RESOLUTION_MC = 8
-    INTERMITTENT_MC    = 9
+
+class PLAN(IntEnum):
+    STAND_BY = 0
+    MAX_BATTERY = 1
+    TYPICAL = 2
+    HOSPITAL = 3
+    HZ = 4
+    HOSPITAL_RAW = 5
+    RESERVED = 6
+    TYPICAL_MULTICOLOR = 7
+    HOSPITAL_MULTICOLOR = 8
+    CONT_GREEN_INT_MULTICOLOR_RAW = 9
+    CONT_GREEN_INT_MULTICOLOR = 10
 
 class PLAN_FREQUENCY(Enum):
     FREQ_32HZ  = 1

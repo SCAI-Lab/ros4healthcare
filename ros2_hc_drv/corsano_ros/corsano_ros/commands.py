@@ -1,7 +1,18 @@
+from __future__ import annotations
+
 import abc
-from util import FileNames, ModeID, CHG_STATUS, PLAN, PLAN_FREQUENCY, SPECIAL_MODES
 import struct
 from datetime import datetime
+from typing import Any, Dict
+
+from corsano_ros.corsano_enums import (
+    FileNames,
+    ModeID,
+    CHG_STATUS,
+    PLAN,
+    PLAN_FREQUENCY,
+    SPECIAL_MODES,
+)
 
 class BaseCommand(metaclass=abc.ABCMeta):
     cmd = int()
@@ -368,6 +379,61 @@ class CMD_UNKNOWN(BaseCommand):
 
     def str(self, data):
         return (data.values())
+
+
+# =============================================================================
+# Vendor (HCI) Commands
+# =============================================================================
+
+class VendorCommand(Command):
+    """Generic vendor command base class for HCI opcodes."""
+
+    hci_type = 0x01
+
+    def _build_packet(self, opcode: int, params: bytes) -> bytes:
+        return (
+            self.hci_type.to_bytes(1, "little") +
+            opcode.to_bytes(2, "little") +
+            len(params).to_bytes(1, "little") +
+            params
+        )
+
+
+class VENDOR_CMD_FD53(VendorCommand):
+    """Vendor command 0xFD53 (BioZ recording)."""
+    cmd = 0xFD53
+
+    def execute(self) -> bytes:
+        return self._build_packet(self.cmd, bytes.fromhex("00 01"))
+
+
+class VENDOR_CMD_FD7D(VendorCommand):
+    """Vendor command 0xFD7D (BioZ recording)."""
+    cmd = 0xFD7D
+
+    def execute(self) -> bytes:
+        return self._build_packet(self.cmd, bytes.fromhex("00 01"))
+
+
+class VENDOR_CMD_FC2D(VendorCommand):
+    """Vendor command 0xFC2D (custom opcode)."""
+    cmd = 0xFC2D
+
+    def execute(self) -> bytes:
+        return self._build_packet(self.cmd, bytes.fromhex("01"))
+
+
+class VENDOR_CMD_FD57(VendorCommand):
+    """Vendor command 0xFD57 (BioZ recording)."""
+    cmd = 0xFD57
+
+    def execute(self) -> bytes:
+        return self._build_packet(self.cmd, bytes.fromhex("00 01"))
+
+
+# =============================================================================
+# Command Registry
+# =============================================================================
 
 commands = (
     CMD_START_STREAMING_DATA,
