@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import struct
 from datetime import datetime
-from typing import Any, Dict
 
 from corsano_ros.corsano_enums import (
     FileNames,

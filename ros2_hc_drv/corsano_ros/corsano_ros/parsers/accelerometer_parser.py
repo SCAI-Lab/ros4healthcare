@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from logging import info, warning, error
 import numpy as np
 from dataclasses import dataclass
 from datetime import timezone
@@ -41,12 +41,11 @@ class AccelerometerParser:
 
     ACC_SR: int = 32  # Sampling rate in Hz (samples per second)
 
-    def __init__(self, time_zone: timezone = timezone.utc, callback= None) -> None:
+    def __init__(self, time_zone: timezone = timezone.utc) -> None:
         self.acc_time: float = 0.0
         self.time_zone: timezone = time_zone
         self.normalize: bool = False
         self.last_index: Optional[int] = None
-        self.callback = callback
 
     def process_metric_array(
         self,
@@ -70,8 +69,8 @@ class AccelerometerParser:
             or None otherwise.
         """
         if metric_id != 0x2B:
-            print(f"Skipping unsupported metric ID: 0x{metric_id:02X} ({metric_id})")
-            return processed_index + metric_size, None
+            warning(f"[AccelerometerParser] Skipping unsupported metric ID: 0x{metric_id:02X} ({metric_id})")
+            return None
 
         return self._process_acc(metric_array, processed_index, metric_size)
 
@@ -82,7 +81,6 @@ class AccelerometerParser:
         metric_size: int
     ) -> Tuple[int, AccelerometerData]:
         """Decode an accelerometer metric packet into structured data."""
-        print("Processing accelerometer data...")
 
         # --- Parse 4-byte header ---
         index = metric_array[processed_index]
@@ -95,7 +93,7 @@ class AccelerometerParser:
         if self.last_index is not None:
             expected = (self.last_index + 1) % 256
             if index != expected:
-                print(f"[Warning] Packet drop detected: expected {expected}, got {index}")
+                warning(f"[AccelerometerParser]  Packet drop detected: expected {expected}, got {index}")
         self.last_index = index
 
         # --- Number of samples ---
@@ -136,14 +134,9 @@ class AccelerometerParser:
             z_values=z_values,
             timestamp_ms=self.acc_time
         )
-        print(f"Accelerometer Data: {data}")
-
-        if self.callback:
-            self.callback(data)
-
         # Update timestamp
         self.acc_time += num_samples * 1000.0 / self.ACC_SR
-        return processed_index, data
+        return data
 
     def reset(self) -> None:
         """Reset parser timestamp and packet counter."""

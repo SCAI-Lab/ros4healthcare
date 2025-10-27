@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from logging import error
 import struct
 from dataclasses import dataclass
 from datetime import datetime
@@ -87,7 +87,7 @@ class ActivityParser:
         try:
             unpacked = struct.unpack(cls.STRUCT_FORMAT, data[:-1])
         except struct.error as e:
-            print(f"[Error] Failed to unpack activity data: {e}")
+            error(f"[ActivityParser]  Failed to unpack activity data: {e}")
             return None
 
         return ActivityData(
