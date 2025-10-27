@@ -1,12 +1,47 @@
-import struct
-from datetime import datetime
-from util import check_crc, ACTIVITY_TYPE
+from __future__ import annotations
 
-q = b'\xcaR\xaee\x00\x00\x00\x00\x00\x00\x00\xdf\x17\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xaa\x00l\xf6S\xaee\x00\x00\x00\x00\x00\x00\x00\xdf\x17\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xaa\x00='
+import struct
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+from corsano_ros.corsano_enums import check_crc, ACTIVITY_TYPE
+
+
+@dataclass
+class ActivityData:
+    """
+    Container for parsed activity data from a Corsano device.
+    """
+
+    timestamp: datetime
+    hr_filtered: int
+    hr_filtered_q: int
+    steps: int
+    activity_type: ACTIVITY_TYPE
+    speed: int
+    spo2: int
+    energy: int
+    rr_filtered: float
+    rr_raw_q: int
+    battery: int
+    hr_raw: int
+    hr_raw_q: int
+    spo2_q: int
+    stress: int
+    stress_q: int
+    calories: int
+    temp1: int
+    temp2: int
+    wearing: int
+
 
 class ActivityParser:
     """
+    Parser for Corsano activity packets.
+
+    Reference:
     https://developer.corsano.com/ble/ble_commands/files_format/acitivity_file
+
     B0-B3   Unix timestamp                                                [long]
     B4      Filtered heart rate                                           [unsigned char]
     B5      Quality of Filtered Hear rate  4(good) - 0(bad)               [unsigned char]
@@ -31,31 +66,49 @@ class ActivityParser:
     B36     Wearing status of the bracelet 0(not wearing) 4(on the wrist) [unsigned char]
     B37     CRC8 of the message                                           [unsigned char]
     """
-    activity_struct = "<l2BH3BH6BHBH7x2hxBx"
+
+    STRUCT_FORMAT = "<l2BH3BH6BHBH7x2hxB"
+    STRUCT_SIZE = struct.calcsize(STRUCT_FORMAT)
+
     @classmethod
-    def parse(self, data):
+    def parse(cls, data: bytes) -> Optional[ActivityData]:
+        """
+        Parse a raw activity packet.
+
+        Args:
+            data: Raw binary data (should match STRUCT_SIZE + 1 bytes including CRC).
+
+        Returns:
+            An ActivityData object if CRC is valid, otherwise None.
+        """
+
         if check_crc(data[:-1]) != data[-1]:
             return None
-        d = {}
-        u = struct.unpack(self.activity_struct, data)
-        d["timestamp"] = datetime.fromtimestamp(u[0])
-        d["hr_filtered"] = u[1]
-        d["hr_filtered_q"] = u[2]
-        d["steps"] = u[3]
-        d["activity_type"] = ACTIVITY_TYPE(u[4])
-        d["speed"] = u[5]
-        d["spo2"] = u[6]
-        d["energy"] = u[7]
-        d["rr_filtered"] = u[8]/4.0
-        d["rr_raw_q"] = u[9]
-        d["battery"] = u[10]
-        d["hr_raw"] = u[11]
-        d["hr_raw_q"] = u[12]
-        d["spo2_q"] = u[13]
-        d["stress"] = u[14]
-        d["stress_q"] = u[15]
-        d["calories"] = u[16]
-        d["temp1"] = u[17]
-        d["temp2"] = u[18]
-        d["wearing"] = u[19]
-        return d
+        try:
+            unpacked = struct.unpack(cls.STRUCT_FORMAT, data[:-1])
+        except struct.error as e:
+            print(f"[Error] Failed to unpack activity data: {e}")
+            return None
+
+        return ActivityData(
+            timestamp=datetime.fromtimestamp(unpacked[0]),
+            hr_filtered=unpacked[1],
+            hr_filtered_q=unpacked[2],
+            steps=unpacked[3],
+            activity_type=ACTIVITY_TYPE(unpacked[4]),
+            speed=unpacked[5],
+            spo2=unpacked[6],
+            energy=unpacked[7],
+            rr_filtered=unpacked[8] / 4.0,
+            rr_raw_q=unpacked[9],
+            battery=unpacked[10],
+            hr_raw=unpacked[11],
+            hr_raw_q=unpacked[12],
+            spo2_q=unpacked[13],
+            stress=unpacked[14],
+            stress_q=unpacked[15],
+            calories=unpacked[16],
+            temp1=unpacked[17],
+            temp2=unpacked[18],
+            wearing=unpacked[19],
+        )
