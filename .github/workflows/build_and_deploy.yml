@@ -144,8 +144,6 @@ jobs:
           sudo apt-get install -y gnupg wget lsb-release
 
           # Add aptly official repo
-          wget -qO - https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /usr/share/keyrings/aptly-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/aptly-archive-keyring.gpg] https://www.aptly.info/ stable main" | sudo tee /etc/apt/sources.list.d/aptly.list
           sudo apt-get update
           sudo apt-get install -y aptly
 
