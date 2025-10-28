@@ -1,0 +1,190 @@
+name: Build and Create Debians
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build-debs:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - ros_distro: humble
+            arch: amd64
+            os_version: jammy
+          - ros_distro: humble
+            arch: arm64
+            os_version: jammy
+          - ros_distro: rolling
+            arch: amd64
+            os_version: noble
+          - ros_distro: rolling
+            arch: arm64
+            os_version: noble
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create build script for Docker
+        run: |
+          cat <<'EOF' > build_in_docker.sh
+          #!/bin/bash
+          set -e
+
+          ROS_DISTRO=$1
+          OS_VERSION=$2
+
+          apt update
+          apt install -y git python3-colcon-common-extensions python3-rosdep \
+                        dpkg-dev fakeroot devscripts build-essential \
+                        debhelper dh-python \
+                        python3-bloom
+          apt install -y git python3-ament-package || true
+          apt install ros-$ROS_DISTRO-rcutils || true
+          source /opt/ros/$ROS_DISTRO/setup.bash
+          mkdir -p /etc/ros/rosdep/sources.list.d
+
+          if [ -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+            sudo rm /etc/ros/rosdep/sources.list.d/20-default.list
+          fi
+
+          echo "yaml file:///tmp/rosdep_combined_override.yaml" > /etc/ros/rosdep/sources.list.d/50-local.list
+
+          if [ -f /workspace/rosdep_override.yaml ]; then
+            cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
+          else
+            echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
+          fi
+
+          for pkg in $(colcon list --names-only); do
+            deb_pkg="ros-$ROS_DISTRO-${pkg//_/-}"
+            echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
+            echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
+            echo "    $OS_VERSION: [$deb_pkg]" >> /tmp/rosdep_combined_override.yaml
+          done
+
+          rosdep init || true
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+          mkdir -p /workspace/debs
+          INITIAL_DIR=$(pwd)
+
+          for pkg in $(colcon list --paths-only --topological-order); do
+            echo "Processing package: $pkg"
+            cd $pkg
+
+            bloom-generate rosdebian --ros-distro $ROS_DISTRO --os-name ubuntu --os-version $OS_VERSION
+
+            if ! grep -r --include='CMakeLists.txt' 'add_executable\|ament_target_dependencies' .; then
+              echo "No C++ binaries detected, removing \${shlibs:Depends} from debian/control"
+              sed -i 's/${shlibs:Depends},\s*//g' debian/control
+              sed -i 's/${shlibs:Depends}//g' debian/control
+            fi
+
+            fakeroot debian/rules binary
+
+            find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
+            dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+
+            source /opt/ros/$ROS_DISTRO/setup.bash
+            cd $INITIAL_DIR
+          done
+          EOF
+
+          chmod +x build_in_docker.sh
+
+      - name: Run Docker container to build packages
+        run: |
+          docker run --rm --privileged --platform linux/${{ matrix.arch }} \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            ros:${{ matrix.ros_distro }}-ros-base bash /workspace/build_in_docker.sh ${{ matrix.ros_distro }} ${{ matrix.os_version }}
+
+      - name: Upload .deb files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros-debian-packages-${{ matrix.ros_distro }}-${{ matrix.arch }}
+          path: debs/*.deb
+
+      - name: Recompress .deb files for aptly compatibility
+        run: |
+          mkdir -p debs_recompressed
+          for f in debs/*.deb; do
+            echo "Recompressing $f..."
+            dpkg-deb -R "$f" tmp_deb
+            dpkg-deb -bZgzip tmp_deb "debs_recompressed/$(basename "$f")"
+            rm -rf tmp_deb
+          done
+
+          echo "Replacing old debs with recompressed ones..."
+          sudo rm -rf debs
+          sudo mv debs_recompressed debs
+          sudo chown -R $USER:$USER debs
+
+      - name: Create and publish APT repository
+        env:
+          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+        run: |
+          set -e
+
+          # Install gnupg + upgraded aptly >=1.5
+          sudo apt-get update
+          sudo apt-get install -y gnupg wget lsb-release
+
+          # Add aptly official repo
+          wget -qO - https://www.aptly.info/pubkey.txt | sudo gpg --dearmor -o /usr/share/keyrings/aptly-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/aptly-archive-keyring.gpg] https://www.aptly.info/ stable main" | sudo tee /etc/apt/sources.list.d/aptly.list
+          sudo apt-get update
+          sudo apt-get install -y aptly
+
+          # Restore GPG key
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
+
+          # Extract key ID
+          GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          echo "Using GPG key $GPG_KEY"
+
+          # Define output folder at repo root
+          OUTPUT_DIR="${GITHUB_WORKSPACE}/gh-pages/${{ matrix.ros_distro }}-${{ matrix.arch }}"
+          mkdir -p "$OUTPUT_DIR"
+
+          # Create temporary repo
+          TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
+          rm -rf "$TEMP_REPO"
+          mkdir -p "$TEMP_REPO"
+          cd "$TEMP_REPO"
+
+          DISTRO=${{ matrix.ros_distro }}
+          ARCH=${{ matrix.arch }}
+          OS_VERSION=${{ matrix.os_version }}
+
+          # Create local aptly repo
+          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main healthcare-msgs-${DISTRO}-${ARCH}
+          aptly repo add healthcare-msgs-${DISTRO}-${ARCH} ../debs/*.deb
+
+          # Publish repo using filesystem: (requires aptly >=1.5)
+          aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" healthcare-msgs-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
+
+          # Export GPG key for users
+          gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          keep_files: true
