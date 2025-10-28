@@ -157,9 +157,6 @@ jobs:
           # Fix missing dependencies if any
           sudo apt-get install -f -y
 
-          # Verify installation
-          aptly version
-
           # Restore GPG key
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
