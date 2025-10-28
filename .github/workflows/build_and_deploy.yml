@@ -151,17 +151,16 @@ jobs:
               URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_darwin_arm64.zip"
           fi
 
-          curl -sL $URL -o aptly.tar.gz
-          tar -xzf aptly.tar.gz
+          # Install unzip if missing
+          sudo apt update && sudo apt install -y unzip
+
+          # Download and unzip
+          curl -L $URL -o aptly.zip
+          unzip aptly.zip
           chmod +x aptly
           sudo mv aptly /usr/local/bin/aptly
 
-          aptly version
-
-          # Install it
-          sudo dpkg -i aptly.deb
-
-          # Ensure it works
+          # Verify
           aptly version
 
           # Fix missing dependencies if any
