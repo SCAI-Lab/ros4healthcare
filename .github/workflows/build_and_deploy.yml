@@ -133,6 +133,18 @@ jobs:
           sudo mv debs_recompressed debs
           sudo chown -R $USER:$USER debs
 
+      - name: Create Aptly config
+        run: |
+          mkdir -p ~/.aptly
+          echo '{
+            "rootDir": "'"$HOME"'/.aptly",
+            "publishEndpoints": {
+              "filesystem": {
+                "rootDir": "'"${GITHUB_WORKSPACE}/gh-pages"'",
+                "linkMethod": "hardlink"
+              }
+            }
+          }' > ~/.aptly/aptly.conf
       - name: Create and publish APT repository (snapshot)
         env:
           GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
@@ -165,20 +177,6 @@ jobs:
           echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
           GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
           echo "Using GPG key $GPG_KEY"
-
-          # Create minimal Aptly config with filesystem endpoint
-          mkdir -p ~/.aptly
-          cat > ~/.aptly/aptly.conf <<EOF
-      {
-        "rootDir": "$HOME/.aptly",
-        "publishEndpoints": {
-          "filesystem": {
-            "rootDir": "${GITHUB_WORKSPACE}/gh-pages",
-            "linkMethod": "hardlink"
-          }
-        }
-      }
-      EOF
 
           # Prepare temporary repo
           TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
