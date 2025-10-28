@@ -142,13 +142,17 @@ jobs:
           # Update packages
           sudo apt update
           sudo apt install -y lsb-release gnupg wget curl
+          sudo apt install -y golang-go debhelper dh-make
 
-          # Download the latest Aptly release (replace v1.6.0 with latest if needed)
-          LATEST_VERSION="1.6.0"
-          wget https://github.com/aptly-dev/aptly/releases/download/v${LATEST_VERSION}/aptly_${LATEST_VERSION}_linux_amd64.deb
+          # Clone the Aptly repository
+          git clone https://github.com/aptly-dev/aptly.git
+          cd aptly
 
-          # Install the downloaded package
-          sudo dpkg -i aptly_${LATEST_VERSION}_linux_amd64.deb
+          # Build the package
+          dpkg-buildpackage -us -uc
+
+          # Install the package
+          sudo dpkg -i ../aptly_*.deb
 
           # Fix missing dependencies if any
           sudo apt-get install -f -y
