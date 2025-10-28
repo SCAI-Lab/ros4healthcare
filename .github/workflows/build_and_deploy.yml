@@ -197,17 +197,16 @@ jobs:
           OS_VERSION=${{ matrix.os_version }}
 
           # Create local aptly repo
-          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main ros4healhcare-${DISTRO}-${ARCH}
-          aptly repo add ros4healhcare-${DISTRO}-${ARCH} ../debs/*.deb
+          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main ros4healthcare-${DISTRO}-${ARCH}
+          aptly repo add ros4healthcare-${DISTRO}-${ARCH} ../debs/*.deb
 
           # Publish repo using filesystem: (requires aptly >=1.5)
-          # aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" ros4healhcare-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
+          aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" ros4healthcare-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
           # Create a snapshot from your local repo
-          SNAPSHOT_NAME=ros4healhcare-${DISTRO}-${ARCH}-snap
-          aptly snapshot create $SNAPSHOT_NAME from repo ros4healhcare-${DISTRO}-${ARCH}
-
-          # Publish repo using file backend (works in all builds)
-          aptly publish snapshot -architectures=$ARCH -gpg-key="$GPG_KEY" $SNAPSHOT_NAME file:"$OUTPUT_DIR"
+          # SNAPSHOT_NAME=ros4healthcare-${DISTRO}-${ARCH}-snap
+          # aptly snapshot create $SNAPSHOT_NAME from repo ros4healthcare-${DISTRO}-${ARCH}
+          # # Publish the snapshot using filesystem
+          # aptly publish snapshot -architectures=$ARCH -gpg-key="$GPG_KEY" $SNAPSHOT_NAME filesystem:"$OUTPUT_DIR"
 
           # Export GPG key for users
           gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
