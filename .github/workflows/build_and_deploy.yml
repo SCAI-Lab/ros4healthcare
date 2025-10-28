@@ -142,10 +142,21 @@ jobs:
           # Update packages
           sudo apt update
           sudo apt install -y lsb-release gnupg wget curl
-          sudo apt install -y golang-go debhelper dh-make
 
-          # Download the latest 1.5.x release (Linux amd64 example)
-          curl -sL https://github.com/aptly-dev/aptly/releases/download/v1.5.2/aptly_1.5.2_linux_amd64.deb -o aptly.deb
+          ARCH=$(dpkg --print-architecture)
+
+          if [ "$ARCH" = "amd64" ]; then
+              URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_darwin_amd64.zip"
+          else
+              URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_darwin_arm64.zip"
+          fi
+
+          curl -sL $URL -o aptly.tar.gz
+          tar -xzf aptly.tar.gz
+          chmod +x aptly
+          sudo mv aptly /usr/local/bin/aptly
+
+          aptly version
 
           # Install it
           sudo dpkg -i aptly.deb
