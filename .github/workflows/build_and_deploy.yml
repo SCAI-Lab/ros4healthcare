@@ -139,15 +139,22 @@ jobs:
         run: |
           set -e
 
-          # Install gnupg + upgraded aptly >=1.5
-          sudo apt-get update
-          sudo apt-get install -y gnupg wget lsb-release
+          # Update packages
+          sudo apt update
+          sudo apt install -y lsb-release gnupg wget curl
 
-          # Add aptly official repo
-          APTLY_VERSION=1.5.1
-          wget https://github.com/aptly-dev/aptly/releases/download/v${APTLY_VERSION}/aptly_${APTLY_VERSION}_linux_amd64.deb
-          sudo dpkg -i aptly_${APTLY_VERSION}_linux_amd64.deb
+          # Download the latest Aptly release (replace v1.6.0 with latest if needed)
+          LATEST_VERSION="1.6.0"
+          wget https://github.com/aptly-dev/aptly/releases/download/v${LATEST_VERSION}/aptly_${LATEST_VERSION}_linux_amd64.deb
 
+          # Install the downloaded package
+          sudo dpkg -i aptly_${LATEST_VERSION}_linux_amd64.deb
+
+          # Fix missing dependencies if any
+          sudo apt-get install -f -y
+
+          # Verify installation
+          aptly version
 
           # Restore GPG key
           mkdir -p ~/.gnupg
