@@ -93,6 +93,16 @@ jobs:
               sed -i 's/${shlibs:Depends}//g' debian/control
             fi
 
+            if ! grep -q "override_dh_auto_test" debian/rules; then
+              echo "Adding override_dh_auto_test to skip pytest..."
+              cat <<'EOF' >> debian/rules
+
+          override_dh_auto_test:
+            @echo "Skipping tests because none are defined"
+          EOF
+            fi
+            chmod +x debian/rules
+
             fakeroot debian/rules binary
 
             find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
