@@ -206,8 +206,8 @@ jobs:
           SNAPSHOT_NAME=ros4healhcare-${DISTRO}-${ARCH}-snap
           aptly snapshot create $SNAPSHOT_NAME from repo ros4healhcare-${DISTRO}-${ARCH}
 
-          # Publish the snapshot using filesystem
-          aptly publish snapshot -architectures=$ARCH -gpg-key="$GPG_KEY" $SNAPSHOT_NAME filesystem:"$OUTPUT_DIR"
+          # Publish repo using file backend (works in all builds)
+          aptly publish snapshot -architectures=$ARCH -gpg-key="$GPG_KEY" $SNAPSHOT_NAME file:"$OUTPUT_DIR"
 
           # Export GPG key for users
           gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
