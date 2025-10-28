@@ -144,15 +144,14 @@ jobs:
           sudo apt install -y lsb-release gnupg wget curl
           sudo apt install -y golang-go debhelper dh-make
 
-          # Clone the Aptly repository
-          git clone https://github.com/aptly-dev/aptly.git
-          cd aptly
+          # Download the latest 1.5.x release (Linux amd64 example)
+          curl -sL https://github.com/aptly-dev/aptly/releases/download/v1.5.2/aptly_1.5.2_linux_amd64.deb -o aptly.deb
 
-          # Build the package
-          dpkg-buildpackage -us -uc
+          # Install it
+          sudo dpkg -i aptly.deb
 
-          # Install the package
-          sudo dpkg -i ../aptly_*.deb
+          # Ensure it works
+          aptly version
 
           # Fix missing dependencies if any
           sudo apt-get install -f -y
