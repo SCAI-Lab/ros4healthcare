@@ -148,6 +148,7 @@ jobs:
       - name: Create and publish APT repository (snapshot)
         env:
           GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+          APTLY_CONFIG: $HOME/.aptly/aptly.conf
         run: |
           set -e
 
