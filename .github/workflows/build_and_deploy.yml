@@ -189,19 +189,12 @@ jobs:
           ARCH=${{ matrix.arch }}
           OS_VERSION=${{ matrix.os_version }}
           REPO_NAME="ros4healthcare-${DISTRO}-${ARCH}"
-          OUTPUT_DIR="${GITHUB_WORKSPACE}/gh-pages/${DISTRO}-${ARCH}"
-          mkdir -p "$OUTPUT_DIR"
 
-          # Create local repo and add debs
           aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main "$REPO_NAME"
           aptly repo add "$REPO_NAME" ../debs/*.deb
-
-          # Create snapshot
           SNAPSHOT_NAME="${REPO_NAME}-snap"
           aptly snapshot create "$SNAPSHOT_NAME" from repo "$REPO_NAME"
-
-          # Publish snapshot
-          aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"${DISTRO}-${ARCH}"
+          aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"$REPO_NAME"
 
           # Export GPG key for users
           gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
