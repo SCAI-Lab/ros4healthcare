@@ -156,12 +156,19 @@ jobs:
 
           # Download and unzip
           curl -L $URL -o aptly.zip
+          # Unzip
           unzip aptly.zip
-          chmod +x aptly
-          sudo mv aptly /usr/local/bin/aptly
+
+          # Detect folder
+          FOLDER=$(unzip -Z -1 aptly.zip | head -n1 | cut -d/ -f1)
+
+          # Make binary executable and move to PATH
+          chmod +x "$FOLDER/aptly"
+          sudo mv "$FOLDER/aptly" /usr/local/bin/aptly
 
           # Verify
           aptly version
+
 
           # Fix missing dependencies if any
           sudo apt-get install -f -y
