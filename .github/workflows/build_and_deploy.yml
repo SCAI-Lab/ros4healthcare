@@ -144,8 +144,10 @@ jobs:
           sudo apt-get install -y gnupg wget lsb-release
 
           # Add aptly official repo
-          sudo apt-get update
-          sudo apt-get install -y aptly
+          APTLY_VERSION=1.5.1
+          wget https://github.com/aptly-dev/aptly/releases/download/v${APTLY_VERSION}/aptly_${APTLY_VERSION}_linux_amd64.deb
+          sudo dpkg -i aptly_${APTLY_VERSION}_linux_amd64.deb
+
 
           # Restore GPG key
           mkdir -p ~/.gnupg
@@ -171,11 +173,11 @@ jobs:
           OS_VERSION=${{ matrix.os_version }}
 
           # Create local aptly repo
-          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main healthcare-msgs-${DISTRO}-${ARCH}
-          aptly repo add healthcare-msgs-${DISTRO}-${ARCH} ../debs/*.deb
+          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main ros4healhcare-${DISTRO}-${ARCH}
+          aptly repo add ros4healhcare-${DISTRO}-${ARCH} ../debs/*.deb
 
           # Publish repo using filesystem: (requires aptly >=1.5)
-          aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" healthcare-msgs-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
+          aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" ros4healhcare-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
 
           # Export GPG key for users
           gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
