@@ -7,7 +7,7 @@
   <maintainer email="jorge.penaqueralta@hest.ethz.ch">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
+  <buildtool_export_depend>python3-setuptools</buildtool_export_depend>
 
   <exec_depend>rclpy</exec_depend>
 

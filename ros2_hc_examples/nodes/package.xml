@@ -7,8 +7,7 @@
   <maintainer email="kupper.lucas@gmail.com">lucas</maintainer>
   <license>TODO: License declaration</license>
 
-
-  <buildtool_depend>ament_python</buildtool_depend>
+  <buildtool_export_depend>python3-setuptools</buildtool_export_depend>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>ros2_hc_msgs</exec_depend>

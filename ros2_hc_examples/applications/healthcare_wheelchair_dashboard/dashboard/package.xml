@@ -17,7 +17,8 @@
   <author>Ricardo Manriquez</author>
   <author email="ricardo.manriquez@gmail.com">Ricardo Manríquez</author>
 
-  <exec_depend>python3-catkin-pkg-modules</exec_depend>
+  <buildtool_export_depend>python3-setuptools</buildtool_export_depend>
+
   <exec_depend version_gte="0.2.19">python_qt_binding</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>rqt_gui</exec_depend>
