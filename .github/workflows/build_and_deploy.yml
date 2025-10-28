@@ -133,60 +133,54 @@ jobs:
           sudo mv debs_recompressed debs
           sudo chown -R $USER:$USER debs
 
-      - name: Create and publish APT repository
+      - name: Create and publish APT repository (snapshot)
         env:
           GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
         run: |
           set -e
 
-          # Update packages
+          # Install dependencies
           sudo apt update
-          sudo apt install -y lsb-release gnupg wget curl
+          sudo apt install -y lsb-release gnupg wget curl unzip dpkg-dev
 
           ARCH=$(dpkg --print-architecture)
 
+          # Download Aptly
           if [ "$ARCH" = "amd64" ]; then
               URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_amd64.zip"
           else
               URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_arm.zip"
           fi
 
-          # Install unzip if missing
-          sudo apt update && sudo apt install -y unzip
-
-          # Download and unzip
           curl -L $URL -o aptly.zip
-          # Unzip
           unzip aptly.zip
-
-          # Detect folder
           FOLDER=$(unzip -Z -1 aptly.zip | head -n1 | cut -d/ -f1)
-
-          # Make binary executable and move to PATH
           chmod +x "$FOLDER/aptly"
           sudo mv "$FOLDER/aptly" /usr/local/bin/aptly
-
-          # Verify
           aptly version
-
-
-          # Fix missing dependencies if any
-          sudo apt-get install -f -y
 
           # Restore GPG key
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
-
-          # Extract key ID
           GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
           echo "Using GPG key $GPG_KEY"
 
-          # Define output folder at repo root
-          OUTPUT_DIR="${GITHUB_WORKSPACE}/gh-pages/${{ matrix.ros_distro }}-${{ matrix.arch }}"
-          mkdir -p "$OUTPUT_DIR"
+          # Create minimal Aptly config with filesystem endpoint
+          mkdir -p ~/.aptly
+          cat > ~/.aptly/aptly.conf <<EOF
+      {
+        "rootDir": "$HOME/.aptly",
+        "publishEndpoints": {
+          "filesystem": {
+            "rootDir": "${GITHUB_WORKSPACE}/gh-pages",
+            "linkMethod": "hardlink"
+          }
+        }
+      }
+      EOF
 
-          # Create temporary repo
+          # Prepare temporary repo
           TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
           rm -rf "$TEMP_REPO"
           mkdir -p "$TEMP_REPO"
@@ -195,18 +189,20 @@ jobs:
           DISTRO=${{ matrix.ros_distro }}
           ARCH=${{ matrix.arch }}
           OS_VERSION=${{ matrix.os_version }}
+          REPO_NAME="ros4healthcare-${DISTRO}-${ARCH}"
+          OUTPUT_DIR="${GITHUB_WORKSPACE}/gh-pages/${DISTRO}-${ARCH}"
+          mkdir -p "$OUTPUT_DIR"
 
-          # Create local aptly repo
-          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main ros4healthcare-${DISTRO}-${ARCH}
-          aptly repo add ros4healthcare-${DISTRO}-${ARCH} ../debs/*.deb
+          # Create local repo and add debs
+          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main "$REPO_NAME"
+          aptly repo add "$REPO_NAME" ../debs/*.deb
 
-          # Publish repo using filesystem: (requires aptly >=1.5)
-          aptly publish repo -architectures=$ARCH -gpg-key="$GPG_KEY" ros4healthcare-${DISTRO}-${ARCH} filesystem:"$OUTPUT_DIR"
-          # Create a snapshot from your local repo
-          # SNAPSHOT_NAME=ros4healthcare-${DISTRO}-${ARCH}-snap
-          # aptly snapshot create $SNAPSHOT_NAME from repo ros4healthcare-${DISTRO}-${ARCH}
-          # # Publish the snapshot using filesystem
-          # aptly publish snapshot -architectures=$ARCH -gpg-key="$GPG_KEY" $SNAPSHOT_NAME filesystem:"$OUTPUT_DIR"
+          # Create snapshot
+          SNAPSHOT_NAME="${REPO_NAME}-snap"
+          aptly snapshot create "$SNAPSHOT_NAME" from repo "$REPO_NAME"
+
+          # Publish snapshot
+          aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"${DISTRO}-${ARCH}"
 
           # Export GPG key for users
           gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
