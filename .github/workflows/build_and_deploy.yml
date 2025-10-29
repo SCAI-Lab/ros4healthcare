@@ -118,90 +118,90 @@ jobs:
           name: ros-debian-packages-${{ matrix.ros_distro }}-${{ matrix.arch }}
           path: debs/*.deb
 
-      - name: Recompress .deb files for aptly compatibility
-        run: |
-          mkdir -p debs_recompressed
-          for f in debs/*.deb; do
-            echo "Recompressing $f..."
-            dpkg-deb -R "$f" tmp_deb
-            dpkg-deb -bZgzip tmp_deb "debs_recompressed/$(basename "$f")"
-            rm -rf tmp_deb
-          done
+      # - name: Recompress .deb files for aptly compatibility
+      #   run: |
+      #     mkdir -p debs_recompressed
+      #     for f in debs/*.deb; do
+      #       echo "Recompressing $f..."
+      #       dpkg-deb -R "$f" tmp_deb
+      #       dpkg-deb -bZgzip tmp_deb "debs_recompressed/$(basename "$f")"
+      #       rm -rf tmp_deb
+      #     done
 
-          echo "Replacing old debs with recompressed ones..."
-          sudo rm -rf debs
-          sudo mv debs_recompressed debs
-          sudo chown -R $USER:$USER debs
+      #     echo "Replacing old debs with recompressed ones..."
+      #     sudo rm -rf debs
+      #     sudo mv debs_recompressed debs
+      #     sudo chown -R $USER:$USER debs
 
-      - name: Create Aptly config
-        run: |
-          mkdir -p ~/.aptly
-          echo '{
-            "rootDir": "'"$HOME"'/.aptly",
-            "publishEndpoints": {
-              "filesystem": {
-                "rootDir": "'"${GITHUB_WORKSPACE}/gh-pages"'",
-                "linkMethod": "hardlink"
-              }
-            }
-          }' > ~/.aptly/aptly.conf
-      - name: Create and publish APT repository (snapshot)
-        env:
-          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
-          APTLY_CONFIG: $HOME/.aptly/aptly.conf
-        run: |
-          set -e
+      # - name: Create Aptly config
+      #   run: |
+      #     mkdir -p ~/.aptly
+      #     echo '{
+      #       "rootDir": "'"$HOME"'/.aptly",
+      #       "publishEndpoints": {
+      #         "filesystem": {
+      #           "rootDir": "'"${GITHUB_WORKSPACE}/gh-pages"'",
+      #           "linkMethod": "hardlink"
+      #         }
+      #       }
+      #     }' > ~/.aptly/aptly.conf
+      # - name: Create and publish APT repository (snapshot)
+      #   env:
+      #     GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+      #     APTLY_CONFIG: $HOME/.aptly/aptly.conf
+      #   run: |
+      #     set -e
 
-          # Install dependencies
-          sudo apt update
-          sudo apt install -y lsb-release gnupg wget curl unzip dpkg-dev
+      #     # Install dependencies
+      #     sudo apt update
+      #     sudo apt install -y lsb-release gnupg wget curl unzip dpkg-dev
 
-          ARCH=$(dpkg --print-architecture)
+      #     ARCH=$(dpkg --print-architecture)
 
-          # Download Aptly
-          if [ "$ARCH" = "amd64" ]; then
-              URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_amd64.zip"
-          else
-              URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_arm.zip"
-          fi
+      #     # Download Aptly
+      #     if [ "$ARCH" = "amd64" ]; then
+      #         URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_amd64.zip"
+      #     else
+      #         URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_arm.zip"
+      #     fi
 
-          curl -L $URL -o aptly.zip
-          unzip aptly.zip
-          FOLDER=$(unzip -Z -1 aptly.zip | head -n1 | cut -d/ -f1)
-          chmod +x "$FOLDER/aptly"
-          sudo mv "$FOLDER/aptly" /usr/local/bin/aptly
-          aptly version
+      #     curl -L $URL -o aptly.zip
+      #     unzip aptly.zip
+      #     FOLDER=$(unzip -Z -1 aptly.zip | head -n1 | cut -d/ -f1)
+      #     chmod +x "$FOLDER/aptly"
+      #     sudo mv "$FOLDER/aptly" /usr/local/bin/aptly
+      #     aptly version
 
-          # Restore GPG key
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
-          GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
-          echo "Using GPG key $GPG_KEY"
+      #     # Restore GPG key
+      #     mkdir -p ~/.gnupg
+      #     chmod 700 ~/.gnupg
+      #     echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
+      #     GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+      #     echo "Using GPG key $GPG_KEY"
 
-          # Prepare temporary repo
-          TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
-          rm -rf "$TEMP_REPO"
-          mkdir -p "$TEMP_REPO"
-          cd "$TEMP_REPO"
+      #     # Prepare temporary repo
+      #     TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
+      #     rm -rf "$TEMP_REPO"
+      #     mkdir -p "$TEMP_REPO"
+      #     cd "$TEMP_REPO"
 
-          DISTRO=${{ matrix.ros_distro }}
-          ARCH=${{ matrix.arch }}
-          OS_VERSION=${{ matrix.os_version }}
-          REPO_NAME="ros4healthcare-${DISTRO}-${ARCH}"
+      #     DISTRO=${{ matrix.ros_distro }}
+      #     ARCH=${{ matrix.arch }}
+      #     OS_VERSION=${{ matrix.os_version }}
+      #     REPO_NAME="ros4healthcare-${DISTRO}-${ARCH}"
 
-          aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main "$REPO_NAME"
-          aptly repo add "$REPO_NAME" ../debs/*.deb
-          SNAPSHOT_NAME="${REPO_NAME}-snap"
-          aptly snapshot create "$SNAPSHOT_NAME" from repo "$REPO_NAME"
-          aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"$REPO_NAME"
+      #     aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main "$REPO_NAME"
+      #     aptly repo add "$REPO_NAME" ../debs/*.deb
+      #     SNAPSHOT_NAME="${REPO_NAME}-snap"
+      #     aptly snapshot create "$SNAPSHOT_NAME" from repo "$REPO_NAME"
+      #     aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"$REPO_NAME"
 
-          # Export GPG key for users
-          gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
+      #     # Export GPG key for users
+      #     gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./gh-pages
-          keep_files: true
+      # - name: Deploy to GitHub Pages
+      #   uses: peaceiris/actions-gh-pages@v3
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_dir: ./gh-pages
+      #     keep_files: true
