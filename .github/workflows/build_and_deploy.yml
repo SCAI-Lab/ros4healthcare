@@ -49,8 +49,13 @@ jobs:
           apt install -y git python3-colcon-common-extensions python3-rosdep \
                         dpkg-dev fakeroot devscripts build-essential \
                         debhelper dh-python python3-pip
-          pip install -U bloom ament-package --break-system-packages
-
+          if [ "$OS_VERSION" = "noble" ]; then
+            echo "Detected Ubuntu Noble → enabling --break-system-packages"
+            python3 -m pip install -U bloom ament-package --break-system-packages
+          else
+            echo "Detected Ubuntu $OS_VERSION → installing without system break flag"
+            python3 -m pip install -U bloom ament-package
+          fi
           source /opt/ros/$ROS_DISTRO/setup.bash
           mkdir -p /etc/ros/rosdep/sources.list.d
           rm -f /etc/ros/rosdep/sources.list.d/20-default.list
