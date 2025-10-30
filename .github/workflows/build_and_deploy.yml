@@ -7,22 +7,26 @@ on:
 
 jobs:
   build-debs:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - ros_distro: humble
             arch: amd64
             os_version: jammy
+            runner: ubuntu-22.04
           - ros_distro: humble
             arch: arm64
             os_version: jammy
+            runner: ubuntu-22.04
           - ros_distro: jazzy
             arch: amd64
             os_version: noble
+            runner: ubuntu-24.04
           - ros_distro: jazzy
             arch: arm64
             os_version: noble
+            runner: ubuntu-24.04
 
     steps:
       - name: Set up QEMU
@@ -45,20 +49,34 @@ jobs:
           ROS_DISTRO=$1
           OS_VERSION=$2
 
+          echo "==== Installing build dependencies for ROS $ROS_DISTRO ($OS_VERSION) ===="
+
           apt update
-          apt install -y git python3-colcon-common-extensions python3-rosdep \
-                        dpkg-dev fakeroot devscripts build-essential \
-                        debhelper dh-python python3-pip python3-bloom
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            git python3-colcon-common-extensions python3-rosdep \
+            dpkg-dev fakeroot devscripts build-essential \
+            debhelper dh-python python3-pip python3-bloom \
+            ros-$ROS_DISTRO-rosidl-generator-c \
+            ros-$ROS_DISTRO-rosidl-generator-cpp \
+            ros-$ROS_DISTRO-ament-cmake \
+            ros-$ROS_DISTRO-builtin-interfaces
+
           if [ "$OS_VERSION" = "noble" ]; then
             echo "Detected Ubuntu Noble"
           else
             echo "Detected Ubuntu $OS_VERSION"
             apt install -y python3-ament-package
           fi
+
           source /opt/ros/$ROS_DISTRO/setup.bash
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/$ROS_DISTRO/lib
+          export AMENT_PREFIX_PATH=/opt/ros/$ROS_DISTRO:$AMENT_PREFIX_PATH
+          export CMAKE_PREFIX_PATH=/opt/ros/$ROS_DISTRO:$CMAKE_PREFIX_PATH
+
+          echo "==== Environment setup complete ===="
+
           mkdir -p /etc/ros/rosdep/sources.list.d
           rm -f /etc/ros/rosdep/sources.list.d/20-default.list
-
           echo "yaml file:///tmp/rosdep_combined_override.yaml" > /etc/ros/rosdep/sources.list.d/50-local.list
 
           if [ -f /workspace/rosdep_override.yaml ]; then
@@ -80,7 +98,8 @@ jobs:
 
           rosdep init || true
           rosdep update
-          rosdep install --from-paths . --ignore-src -r -y
+          rosdep install --from-paths . --ignore-src -r -y \
+            --skip-keys="builtin_interfaces rclcpp rclpy"
 
           mkdir -p /workspace/debs
           INITIAL_DIR=$(pwd)
@@ -91,6 +110,7 @@ jobs:
 
             bloom-generate rosdebian --ros-distro $ROS_DISTRO --os-name ubuntu --os-version $OS_VERSION
 
+            # Remove shlibs dependencies for pure-Python packages
             if ! grep -r --include='CMakeLists.txt' 'add_executable\|ament_target_dependencies' .; then
               echo "No C++ binaries detected, removing \${shlibs:Depends} from debian/control"
               sed -i 's/${shlibs:Depends},\s*//g' debian/control
