@@ -107,11 +107,20 @@ jobs:
 
       - name: Run Docker container to build packages
         run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            IMAGE="arm64v8/ros:${{ matrix.ros_distro }}-ros-base"
+          else
+            IMAGE="ros:${{ matrix.ros_distro }}-ros-base"
+          fi
+
+          echo "Using Docker image: $IMAGE"
+
           docker run --rm --privileged --platform linux/${{ matrix.arch }} \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            ros:${{ matrix.ros_distro }}-ros-base bash /workspace/build_in_docker.sh ${{ matrix.ros_distro }} ${{ matrix.os_version }}
-
+            $IMAGE bash /workspace/build_in_docker.sh \
+              ${{ matrix.ros_distro }} ${{ matrix.os_version }}
+              
       - name: Upload .deb files as artifacts
         uses: actions/upload-artifact@v4
         with:
