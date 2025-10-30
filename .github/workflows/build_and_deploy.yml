@@ -51,10 +51,10 @@ jobs:
                         debhelper dh-python python3-pip python3-bloom
           if [ "$OS_VERSION" = "noble" ]; then
             echo "Detected Ubuntu Noble → enabling --break-system-packages"
-            apt install -y python3-ament-package
+            apt install -y ros-${{ matrix.ros_distro }}-python3-ament-package
           else
             echo "Detected Ubuntu $OS_VERSION → installing without system break flag"
-            apt install -y ros-${{ matrix.ros_distro }}-python3-ament-package
+            apt install -y python3-ament-package
           fi
           source /opt/ros/$ROS_DISTRO/setup.bash
           mkdir -p /etc/ros/rosdep/sources.list.d
