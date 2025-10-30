@@ -48,16 +48,12 @@ jobs:
           apt update
           apt install -y git python3-colcon-common-extensions python3-rosdep \
                         dpkg-dev fakeroot devscripts build-essential \
-                        debhelper dh-python \
-                        python3-bloom
-          apt install -y git python3-ament-package || true
-          apt install ros-$ROS_DISTRO-rcutils || true
+                        debhelper dh-python python3-pip
+          pip install -U bloom ament-package
+
           source /opt/ros/$ROS_DISTRO/setup.bash
           mkdir -p /etc/ros/rosdep/sources.list.d
-
-          if [ -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
-            sudo rm /etc/ros/rosdep/sources.list.d/20-default.list
-          fi
+          rm -f /etc/ros/rosdep/sources.list.d/20-default.list
 
           echo "yaml file:///tmp/rosdep_combined_override.yaml" > /etc/ros/rosdep/sources.list.d/50-local.list
 
@@ -73,6 +69,10 @@ jobs:
             echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
             echo "    $OS_VERSION: [$deb_pkg]" >> /tmp/rosdep_combined_override.yaml
           done
+
+          echo "===== ROSDEP COMBINED FILE ====="
+          cat /tmp/rosdep_combined_override.yaml
+          echo "================================"
 
           rosdep init || true
           rosdep update
@@ -120,12 +120,13 @@ jobs:
             -w /workspace \
             $IMAGE bash /workspace/build_in_docker.sh \
               ${{ matrix.ros_distro }} ${{ matrix.os_version }}
-              
+
       - name: Upload .deb files as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ros-debian-packages-${{ matrix.ros_distro }}-${{ matrix.arch }}
           path: debs/*.deb
+
 
       # - name: Recompress .deb files for aptly compatibility
       #   run: |
