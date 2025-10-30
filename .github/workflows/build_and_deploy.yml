@@ -50,10 +50,9 @@ jobs:
                         dpkg-dev fakeroot devscripts build-essential \
                         debhelper dh-python python3-pip python3-bloom
           if [ "$OS_VERSION" = "noble" ]; then
-            echo "Detected Ubuntu Noble → enabling --break-system-packages"
-            apt install -y ros-${{ matrix.ros_distro }}-python3-ament-package
+            echo "Detected Ubuntu Noble"
           else
-            echo "Detected Ubuntu $OS_VERSION → installing without system break flag"
+            echo "Detected Ubuntu $OS_VERSION"
             apt install -y python3-ament-package
           fi
           source /opt/ros/$ROS_DISTRO/setup.bash
