@@ -8,7 +8,7 @@ from corsano_ros.commands import Command
 from logging import error, warning
 import time
 from typing import Optional
-
+import sys
 
 def get_last_activity_data(
     driver: CorsanoDriver,
@@ -42,47 +42,142 @@ def get_last_activity_data(
 
     return activity
 
+def dump_bioz_file(
+    driver: CorsanoDriver,
+    cmd_get_file_size: Command,
+    cmd_stream_file_with_size: Command,
+    cmd_stream_file_with_size_offset: Command,
+    output_path: str,
+    file_name: str = FileNames.BioZ_file,
+    chunk_size: int = 2048,
+) -> bool:
+    """
+    Download the entire BioZ file from the device and write it to a local file.
+    Returns True on success.
+    """
+
+    # --- Get total size ---
+    try:
+        file_info = driver.execute(cmd_get_file_size.cmd, file=file_name)
+        size: int = file_info["size"]
+        print(f"BioZ file size: {size} bytes")
+    except Exception as e:
+        error(f"[dump_bioz_file] Failed to get BioZ file size: {e}")
+        return False
+
+    if size == 0:
+        warning("[dump_bioz_file] BioZ file is empty.")
+        return False
+
+    # --- Open local file ---
+    with open(output_path, "wb") as f_out:
+
+        bytes_downloaded = 0
+
+        while bytes_downloaded < size:
+            try:
+                remaining = size - bytes_downloaded
+                read_size = min(chunk_size, remaining)
+
+                # choose correct command
+                if bytes_downloaded == 0:
+                    driver.execute(
+                        cmd_stream_file_with_size.cmd,
+                        file=file_name,
+                        size=read_size
+                    )
+                else:
+                    driver.execute(
+                        cmd_stream_file_with_size_offset.cmd,
+                        file=file_name,
+                        size=read_size,
+                        offset=bytes_downloaded
+                    )
+
+                # give the buffer time to fill
+                time.sleep(0.1)
+                data = driver.get_buffer().read()
+
+                if not data:
+                    error("[dump_bioz_file] No data returned from device. Retrying...")
+                else:
+
+                    f_out.write(data)
+                    bytes_downloaded += len(data)
+
+                    print(f"Downloaded {bytes_downloaded}/{size} bytes")
+            except Exception as e:
+                error(f"[dump_bioz_file] Error downloading the file, retrying... {e}")
+        print(f"[dump_bioz_file] File successfully saved to: {output_path}")
+        sys.exit()
+
 
 def get_last_bioz_data(
     driver: CorsanoDriver,
     cmd_get_file_size: Command,
     cmd_stream_file_with_size: Command,
     cmd_stream_file_with_size_offset: Command,
-    file_name: str = FileNames["BioZ_file"],
+    file_name: str = FileNames.BioZ_file,
+    chunk_size: int = 2048,
 ) -> Optional[BioZData]:
+    """
+    Fetch the last portion of the BioZ file and decode the last BioZ record.
+    Returns a BioZData object containing record_index, quality, and 25 measurements.
+    """
     parser = BioZParser()
 
+    # --- Get file size ---
     try:
-        file = driver.execute(cmd_get_file_size.cmd, file=file_name)
-        size: int = file["size"]
+        file_info = driver.execute(cmd_get_file_size.cmd, file=file_name)
+        size: int = file_info["size"]
+        print(f"BioZ file size: {size} bytes")
     except Exception as e:
-        error(f"[corsano_ros::get_last_bioz_data] Failed to get BioZ file size: {e}")
+        error(f"[get_last_bioz_data] Failed to get BioZ file size: {e}")
         return None
 
     if size == 0:
-        warning("[corsano_ros::get_last_bioz_data] BioZ file is empty — check measurement plan.")
+        warning("[get_last_bioz_data] BioZ file is empty.")
         return None
 
-    offset: int = max(size - 1024, 0)
-
+    # --- Download last chunk of file ---
+    offset = max(0, size - chunk_size)
+    read_size = min(chunk_size, size - offset)
     try:
         if offset == 0:
-            driver.execute(cmd_stream_file_with_size.cmd, file=file_name, size=size)
+            driver.execute(cmd_stream_file_with_size.cmd, file=file_name, size=read_size)
         else:
             driver.execute(
-                cmd_stream_file_with_size_offset.cmd, file=file_name, size=size, offset=offset
+                cmd_stream_file_with_size_offset.cmd,
+                file=file_name,
+                size=read_size,
+                offset=offset,
             )
     except Exception as e:
-        error(f"[corsano_ros::get_last_bioz_data] Failed to stream BioZ file: {e}")
+        error(f"[get_last_bioz_data] Failed to stream BioZ file: {e}")
         return None
 
-    time.sleep(1)
-    buffer_data: bytes = driver.get_buffer().read()
+    time.sleep(0.5)  # allow buffer to fill
+    buffer_data = driver.get_buffer().read()
+
     if not buffer_data:
-        warning("[corsano_ros::get_last_bioz_data] No data returned from buffer.")
+        warning("[get_last_bioz_data] No data returned from buffer.")
         return None
 
-    return parser.process_metric_array(buffer_data, 0, metric_id=0x3D, metric_size=len(buffer_data))
+    # --- Parse packets and get last ---
+    parser.parse_packets(buffer_data)
+    last_packet = parser.get_last_packet()
+    if last_packet is None:
+        print("[get_last_bioz_data] No BioZ packets found in buffer.")
+        return None
+
+    print(
+        f"[get_last_bioz_data] Decoded last BioZ record: "
+        f"timestamp={last_packet.timestamp}, "
+        f"index={last_packet.record_index}, "
+        f"measurements={last_packet.values}"
+    )
+
+    return last_packet
 
 
 def get_last_stress_data(
@@ -119,7 +214,9 @@ def get_last_stress_data(
         warning("[corsano_ros::get_last_stress_data] No data returned or not enough bytes.")
         return None
 
-    return parser.parse_last_record(buffer_data)
+    stress = parser.parse_last_record(buffer_data)
+    print(stress)
+    return stress
 
 
 def get_last_accelerometer_data(

@@ -17,6 +17,7 @@ from corsano_ros.retrieve_data import (
     get_last_bioz_data,
     get_last_stress_data,
     get_last_accelerometer_data,
+    dump_bioz_file,
 )
 from corsano_ros.commands import (
     VENDOR_CMD_FD53,
@@ -131,10 +132,11 @@ class CorsanoRosWrapper(Node):
 
     def bioz_callback(self, bioz: BioZData):
         """Process BioZ/EDA data and publish."""
-        if bioz.eda_us.size > 0 and not np.isnan(bioz.eda_us[-1]):
+        if bioz.values.size > 0:
             msg = Float32MultiArray()
-            msg.data = bioz.eda_us.astype(float).tolist()
+            msg.data = bioz.values.astype(float).tolist()
             self.bioz_pub.publish(msg)
+        print(bioz)
 
     def stress_callback(self, stress: StressData):
         """Process StressData and publish to ROS topic."""
@@ -179,6 +181,16 @@ class CorsanoRosWrapper(Node):
 
     def request_bioz_data(self):
         if self.driver.connected:
+        #     try:
+        #         dump_bioz_file(
+        #             self.driver,
+        #             self.cmd_get_file_size,
+        #             self.cmd_stream_file_with_size,
+        #             self.cmd_stream_file_with_size_offset,
+        #             "bioz_raw_21_11_2025.bin"
+        #         )
+        #     except Exception as e:
+        #         print(e)
             bioz = get_last_bioz_data(
                 self.driver,
                 self.cmd_get_file_size,
