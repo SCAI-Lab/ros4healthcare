@@ -3,12 +3,12 @@
 import argparse
 import sys
 from logging import error
-import numpy as np
+from datetime import datetime
 
 import rclpy
 from rclpy.node import Node
 from rclpy.utilities import remove_ros_args
-from std_msgs.msg import Int32, Float32MultiArray
+from std_msgs.msg import Int32, Float32MultiArray, Float32
 
 from corsano_ros.corsano_driver import CorsanoDriver
 from corsano_ros.helpers import load_config
@@ -86,6 +86,7 @@ class CorsanoRosWrapper(Node):
         self.hr_pub = self.create_publisher(Int32, "corsano/hr", 10)
         self.rr_pub = self.create_publisher(Int32, "corsano/rr", 10)
         self.bioz_pub = self.create_publisher(Float32MultiArray, "corsano/bioz", 10)
+        self.bioz_pub2 = self.create_publisher(Float32, "corsano/bioz_val", 10)
         self.accel_pub = self.create_publisher(Float32MultiArray, "corsano/acceleration", 10)
         self.stress_pub = self.create_publisher(Float32MultiArray, "corsano/stress", 10)
 
@@ -96,6 +97,7 @@ class CorsanoRosWrapper(Node):
         self.stress_timer = self.create_timer(0.1, self.request_stress_data)
 
         self.get_logger().info("CorsanoWrapper node initialized and ready.")
+        self.dumped_bioz_file = False
 
     def _enable_bioz_streaming(self):
         """Enable BioZ recording via vendor commands."""
@@ -136,6 +138,10 @@ class CorsanoRosWrapper(Node):
             msg = Float32MultiArray()
             msg.data = bioz.values.astype(float).tolist()
             self.bioz_pub.publish(msg)
+            for value in bioz.values.astype(float).tolist():
+                msg2 = Float32()
+                msg2.data = value
+                self.bioz_pub2.publish(msg2)
         print(bioz)
 
     def stress_callback(self, stress: StressData):
@@ -181,16 +187,19 @@ class CorsanoRosWrapper(Node):
 
     def request_bioz_data(self):
         if self.driver.connected:
-        #     try:
-        #         dump_bioz_file(
-        #             self.driver,
-        #             self.cmd_get_file_size,
-        #             self.cmd_stream_file_with_size,
-        #             self.cmd_stream_file_with_size_offset,
-        #             "bioz_raw_21_11_2025.bin"
-        #         )
-        #     except Exception as e:
-        #         print(e)
+
+            # print("Downloading BIOz file")
+            # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # filename = f"bioz_raw_2025_11_24.bin"
+            # dump_bioz_file(
+            #     self.driver,
+            #     self.cmd_get_file_size,
+            #     self.cmd_stream_file_with_size,
+            #     self.cmd_stream_file_with_size_offset,
+            #     filename,
+            # )
+            # self.dumped_bioz_file = True
+
             bioz = get_last_bioz_data(
                 self.driver,
                 self.cmd_get_file_size,
