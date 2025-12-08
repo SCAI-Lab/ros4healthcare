@@ -25,7 +25,7 @@ Your ROS workspace should also include the `healthcare_msgs` package with `EEG` 
 
 ## Installation
 
-Clone the repository into your ROS 2 workspace:
+1. Clone the repository into your ROS 2 workspace
 
 ```bash
 cd ~/ros2_ws/src
@@ -33,7 +33,7 @@ git clone https://github.com/yourusername/neurosity_eeg_driver.git
 
 ```
 
-### Install dependencies:
+2. Install dependencies:
 ```
 pip3 install neurosity-sdk python-dotenv
 ```

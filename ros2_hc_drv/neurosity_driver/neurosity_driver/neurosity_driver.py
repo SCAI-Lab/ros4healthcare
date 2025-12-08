@@ -16,7 +16,9 @@ class NeurosityEEGDriver(Node):
 
         # ROS publishers
         self.eeg_pub = self.create_publisher(EEG, 'neurosity/eeg', 10)
-        self.eeg_info_pub = self.create_publisher(EEGInfo, 'neurosity/eeg_info', 10)
+        # TODO: Make latched topic
+        self.eeg_info_pub = self.create_publisher(EEGInfo, 'neurosity/eeg_info', 1)
+        self.info_published = False
 
         # Neurosity SDK
         self.sdk = NeurositySDK({"device_id": os.getenv("NEUROSITY_DEVICE_ID")})
@@ -62,20 +64,22 @@ class NeurosityEEGDriver(Node):
 
         self.eeg_pub.publish(eeg_msg)
 
-        # EEGInfo
-        info_msg = EEGInfo()
-        info_msg.device_info.session_id = getattr(data.get('info', {}), 'session_id', 'unknown')
-        info_msg.channel_size = len(channels)
-        info_msg.units = EEGInfo.UNIT_UV  # typical for EEG
-        info_msg.selected_preprocessing = [EEGInfo.EEG_PREPROC_NOTCH, EEGInfo.EEG_PREPROC_BANDPASS]
-        info_msg.montage_type = EEGInfo.MONTAGE_TYPE_REFERENTIAL
-        info_msg.electrode_sites = [getattr(EEGInfo, f"ELECTRODE_{name.upper()}", EEGInfo.ELECTRODE_CUSTOM)
-                                    for name in data.get('info', {}).get('channelNames', [])]
-        info_msg.electrode_physical_type = [EEGInfo.ELECTRODE_PHYSICAL_AGCL]*len(channels)
-        info_msg.placement_method = [EEGInfo.PLACEMENT_METHOD_1020]*len(channels)
-        info_msg.signal_mode = EEGInfo.SIGNAL_MODE_SURFACE
+        if not self.info_published:
+            # EEGInfo
+            info_msg = EEGInfo()
+            info_msg.device_info.session_id = getattr(data.get('info', {}), 'session_id', 'unknown')
+            info_msg.channel_size = len(channels)
+            info_msg.units = EEGInfo.UNIT_UV  # typical for EEG
+            info_msg.selected_preprocessing = [EEGInfo.EEG_PREPROC_NOTCH, EEGInfo.EEG_PREPROC_BANDPASS]
+            info_msg.montage_type = EEGInfo.MONTAGE_TYPE_REFERENTIAL
+            info_msg.electrode_sites = [getattr(EEGInfo, f"ELECTRODE_{name.upper()}", EEGInfo.ELECTRODE_CUSTOM)
+                                        for name in data.get('info', {}).get('channelNames', [])]
+            info_msg.electrode_physical_type = [EEGInfo.ELECTRODE_PHYSICAL_AGCL]*len(channels)
+            info_msg.placement_method = [EEGInfo.PLACEMENT_METHOD_1020]*len(channels)
+            info_msg.signal_mode = EEGInfo.SIGNAL_MODE_SURFACE
 
-        self.eeg_info_pub.publish(info_msg)
+            self.eeg_info_pub.publish(info_msg)
+            self.info_published = True
 
 def main(args=None):
     rclpy.init(args=args)
