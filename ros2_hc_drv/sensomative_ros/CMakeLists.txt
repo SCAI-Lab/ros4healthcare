@@ -22,14 +22,6 @@ find_package(rclpy REQUIRED)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-#execute_process(
-#    COMMAND ${Python3_EXECUTABLE} -m pip install --upgrade pip
-#)
-#execute_process(
-#    COMMAND ${Python3_EXECUTABLE} -m pip install scipy plotly kaleido opencv-python
-#)
-# Install Python modules
-ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
@@ -52,10 +44,5 @@ install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
 )
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-endif()
 
 ament_package()

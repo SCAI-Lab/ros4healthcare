@@ -1,0 +1,241 @@
+name: Build and Create Debians
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build-debs:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - ros_distro: humble
+            arch: amd64
+            os_version: jammy
+            runner: ubuntu-22.04
+          - ros_distro: humble
+            arch: arm64
+            os_version: jammy
+            runner: ubuntu-22.04
+          - ros_distro: jazzy
+            arch: amd64
+            os_version: noble
+            runner: ubuntu-24.04
+          - ros_distro: jazzy
+            arch: arm64
+            os_version: noble
+            runner: ubuntu-24.04
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create build script for Docker
+        run: |
+          cat <<'EOF' > build_in_docker.sh
+          #!/bin/bash
+          set -e
+
+          ROS_DISTRO=$1
+          OS_VERSION=$2
+
+          echo "==== Installing build dependencies for ROS $ROS_DISTRO ($OS_VERSION) ===="
+
+          apt update
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            git python3-colcon-common-extensions python3-rosdep \
+            dpkg-dev fakeroot devscripts build-essential \
+            debhelper dh-python python3-pip python3-bloom \
+            ros-$ROS_DISTRO-rosidl-generator-c \
+            ros-$ROS_DISTRO-rosidl-generator-cpp \
+            ros-$ROS_DISTRO-ament-cmake \
+            ros-$ROS_DISTRO-builtin-interfaces
+
+          if [ "$OS_VERSION" = "noble" ]; then
+            echo "Detected Ubuntu Noble"
+          else
+            echo "Detected Ubuntu $OS_VERSION"
+            apt install -y python3-ament-package
+          fi
+
+          source /opt/ros/$ROS_DISTRO/setup.bash
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/$ROS_DISTRO/lib
+          export AMENT_PREFIX_PATH=/opt/ros/$ROS_DISTRO:$AMENT_PREFIX_PATH
+          export CMAKE_PREFIX_PATH=/opt/ros/$ROS_DISTRO:$CMAKE_PREFIX_PATH
+
+          echo "==== Environment setup complete ===="
+
+          mkdir -p /etc/ros/rosdep/sources.list.d
+          rm -f /etc/ros/rosdep/sources.list.d/20-default.list
+          echo "yaml file:///tmp/rosdep_combined_override.yaml" > /etc/ros/rosdep/sources.list.d/50-local.list
+
+          if [ -f /workspace/rosdep_override.yaml ]; then
+            cat /workspace/rosdep_override.yaml > /tmp/rosdep_combined_override.yaml
+          else
+            echo "# Static override not found, starting with empty file" > /tmp/rosdep_combined_override.yaml
+          fi
+
+          for pkg in $(colcon list --names-only); do
+            deb_pkg="ros-$ROS_DISTRO-${pkg//_/-}"
+            echo "$pkg:" >> /tmp/rosdep_combined_override.yaml
+            echo "  ubuntu:" >> /tmp/rosdep_combined_override.yaml
+            echo "    $OS_VERSION: [$deb_pkg]" >> /tmp/rosdep_combined_override.yaml
+          done
+
+          echo "===== ROSDEP COMBINED FILE ====="
+          cat /tmp/rosdep_combined_override.yaml
+          echo "================================"
+
+          rosdep init || true
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y \
+            --skip-keys="builtin_interfaces rclcpp rclpy"
+
+          mkdir -p /workspace/debs
+          INITIAL_DIR=$(pwd)
+
+          for pkg in $(colcon list --paths-only --topological-order); do
+            echo "Processing package: $pkg"
+            cd $pkg
+
+            bloom-generate rosdebian --ros-distro $ROS_DISTRO --os-name ubuntu --os-version $OS_VERSION
+
+            # Remove shlibs dependencies for pure-Python packages
+            if ! grep -r --include='CMakeLists.txt' 'add_executable\|ament_target_dependencies' .; then
+              echo "No C++ binaries detected, removing \${shlibs:Depends} from debian/control"
+              sed -i 's/${shlibs:Depends},\s*//g' debian/control
+              sed -i 's/${shlibs:Depends}//g' debian/control
+            fi
+
+            fakeroot debian/rules binary
+
+            find .. -maxdepth 2 -name '*.deb' -exec mv {} /workspace/debs/ \;
+            dpkg -i /workspace/debs/*.deb || apt-get install -f -y
+
+            source /opt/ros/$ROS_DISTRO/setup.bash
+            cd $INITIAL_DIR
+          done
+          EOF
+
+          chmod +x build_in_docker.sh
+
+      - name: Run Docker container to build packages
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            IMAGE="arm64v8/ros:${{ matrix.ros_distro }}-ros-base"
+          else
+            IMAGE="ros:${{ matrix.ros_distro }}-ros-base"
+          fi
+
+          echo "Using Docker image: $IMAGE"
+
+          docker run --rm --privileged --platform linux/${{ matrix.arch }} \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            $IMAGE bash /workspace/build_in_docker.sh \
+              ${{ matrix.ros_distro }} ${{ matrix.os_version }}
+
+      - name: Upload .deb files as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros-debian-packages-${{ matrix.ros_distro }}-${{ matrix.arch }}
+          path: debs/*.deb
+
+
+      # - name: Recompress .deb files for aptly compatibility
+      #   run: |
+      #     mkdir -p debs_recompressed
+      #     for f in debs/*.deb; do
+      #       echo "Recompressing $f..."
+      #       dpkg-deb -R "$f" tmp_deb
+      #       dpkg-deb -bZgzip tmp_deb "debs_recompressed/$(basename "$f")"
+      #       rm -rf tmp_deb
+      #     done
+
+      #     echo "Replacing old debs with recompressed ones..."
+      #     sudo rm -rf debs
+      #     sudo mv debs_recompressed debs
+      #     sudo chown -R $USER:$USER debs
+
+      # - name: Create Aptly config
+      #   run: |
+      #     mkdir -p ~/.aptly
+      #     echo '{
+      #       "rootDir": "'"$HOME"'/.aptly",
+      #       "publishEndpoints": {
+      #         "filesystem": {
+      #           "rootDir": "'"${GITHUB_WORKSPACE}/gh-pages"'",
+      #           "linkMethod": "hardlink"
+      #         }
+      #       }
+      #     }' > ~/.aptly/aptly.conf
+      # - name: Create and publish APT repository (snapshot)
+      #   env:
+      #     GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+      #     APTLY_CONFIG: $HOME/.aptly/aptly.conf
+      #   run: |
+      #     set -e
+
+      #     # Install dependencies
+      #     sudo apt update
+      #     sudo apt install -y lsb-release gnupg wget curl unzip dpkg-dev
+
+      #     ARCH=$(dpkg --print-architecture)
+
+      #     # Download Aptly
+      #     if [ "$ARCH" = "amd64" ]; then
+      #         URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_amd64.zip"
+      #     else
+      #         URL="https://github.com/aptly-dev/aptly/releases/download/v1.6.2/aptly_1.6.2_linux_arm.zip"
+      #     fi
+
+      #     curl -L $URL -o aptly.zip
+      #     unzip aptly.zip
+      #     FOLDER=$(unzip -Z -1 aptly.zip | head -n1 | cut -d/ -f1)
+      #     chmod +x "$FOLDER/aptly"
+      #     sudo mv "$FOLDER/aptly" /usr/local/bin/aptly
+      #     aptly version
+
+      #     # Restore GPG key
+      #     mkdir -p ~/.gnupg
+      #     chmod 700 ~/.gnupg
+      #     echo "$GPG_PRIVATE_KEY_BASE64" | base64 --decode | gpg --import
+      #     GPG_KEY=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+      #     echo "Using GPG key $GPG_KEY"
+
+      #     # Prepare temporary repo
+      #     TEMP_REPO="${GITHUB_WORKSPACE}/repo_temp"
+      #     rm -rf "$TEMP_REPO"
+      #     mkdir -p "$TEMP_REPO"
+      #     cd "$TEMP_REPO"
+
+      #     DISTRO=${{ matrix.ros_distro }}
+      #     ARCH=${{ matrix.arch }}
+      #     OS_VERSION=${{ matrix.os_version }}
+      #     REPO_NAME="ros4healthcare-${DISTRO}-${ARCH}"
+
+      #     aptly repo create -distribution=${DISTRO}-${OS_VERSION} -component=main "$REPO_NAME"
+      #     aptly repo add "$REPO_NAME" ../debs/*.deb
+      #     SNAPSHOT_NAME="${REPO_NAME}-snap"
+      #     aptly snapshot create "$SNAPSHOT_NAME" from repo "$REPO_NAME"
+      #     aptly publish snapshot -architectures="$ARCH" -gpg-key="$GPG_KEY" "$SNAPSHOT_NAME" filesystem:"$REPO_NAME"
+
+      #     # Export GPG key for users
+      #     gpg --armor --export "$GPG_KEY" > "$OUTPUT_DIR/KEY.gpg"
+
+      # - name: Deploy to GitHub Pages
+      #   uses: peaceiris/actions-gh-pages@v3
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_dir: ./gh-pages
+      #     keep_files: true

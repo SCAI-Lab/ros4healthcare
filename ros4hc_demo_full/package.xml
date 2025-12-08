@@ -10,7 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>polar_ros2</depend>
   <depend>sensomative_ros</depend>
-  <depend>m5_udp_listener_ros</depend>
+  <depend>m5_udp_listener</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

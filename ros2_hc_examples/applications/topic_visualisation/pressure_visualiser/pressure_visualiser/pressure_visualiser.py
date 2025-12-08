@@ -2,10 +2,9 @@
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
-from ros_healthcare_msg.msg import Pressure
+from ros2_hc_msgs.msg import Pressure
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
