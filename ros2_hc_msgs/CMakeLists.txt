@@ -46,6 +46,9 @@ set(msg_files
 "msg/biosensing/raw_biosignals/eog/EOGHeader.msg"
 "msg/biosensing/raw_biosignals/eog/EOG.msg"
 "msg/biosensing/raw_biosignals/eye/PupilGaze.msg"
+"msg/biosensing/derived_biosignals/eye/Blink.msg"
+"msg/biosensing/derived_biosignals/eye/Fixation.msg"
+"msg/biosensing/derived_biosignals/eye/Saccade.msg"
 
 "msg/physical_sensors/external_signals/force/Force.msg"
 "msg/physical_sensors/external_signals/pressure/Pressure.msg"
@@ -56,7 +59,7 @@ set(msg_files
 "msg/physical_sensors/derived_signals/pose/Pose.msg"
 "msg/physical_sensors/derived_signals/elevation_angle/ElevationAngle.msg"
 "msg/physical_sensors/derived_signals/steps/Step.msg"
-"msg/biosensing/derived_biosignals/eye/Blink.msg"
+
 
 "msg/hardware/biosensors/device/Device.msg"
 "msg/hardware/biosensors/filter/Filter.msg"
