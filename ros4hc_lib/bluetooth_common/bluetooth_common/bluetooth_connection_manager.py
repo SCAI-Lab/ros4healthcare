@@ -45,6 +45,8 @@ class BluetoothConnectionManager:
         self.loop = GLib.MainLoop()
         self._loop_thread: Optional[Thread] = None
 
+        self.callback = None
+
     @property
     def mac_address(self) -> Optional[str]:
         if self.device_path and self.device:
@@ -87,6 +89,7 @@ class BluetoothConnectionManager:
             log.info(
                 f"[BluetoothConnectionManager::_connect_device] Connected to {device_path}."
             )
+            self.subscribe_notification()
         except GLib.GError as e:
             self.connected = False
             self.adapter.RemoveDevice(device_path)
@@ -151,7 +154,7 @@ class BluetoothConnectionManager:
             )
             traceback.print_exc()
         finally:
-            self._schedule_reconnect()
+            pass #self._schedule_reconnect()
 
     def _schedule_reconnect(self):
         if not self.reconnecting:
@@ -168,12 +171,14 @@ class BluetoothConnectionManager:
 
     def _subscribe_to_disconnects(self):
         def on_props_changed(_sender, obj_path, _iface, _signal, params):
-            if obj_path != self.device_path:
+            if self.device_path and not obj_path.startswith(self.device_path):
                 return
 
             iface_name, changed, _ = params
-
-            if iface_name == "org.bluez.Device1" and "Connected" in changed:
+            if iface_name == "org.bluez.GattCharacteristic1":
+                if hasattr(self, "callback") and self.callback:
+                    self.callback(changed["Value"])
+            elif iface_name == "org.bluez.Device1" and "Connected" in changed:
                 try:
                     still_connected = self.device.Get("org.bluez.Device1", "Connected")
                 except Exception as e:
@@ -199,6 +204,25 @@ class BluetoothConnectionManager:
             signal_fired=on_props_changed,
         )
 
+    def subscribe_notification(self):
+        print("trying to subscribe")
+        if not self.device_path or not self.target_uuids:
+            raise BluetoothConnectionError(
+                "[subscribe_notification] Device or UUID not set."
+            )
+        target_uuids = [uuid.lower() for uuid in self.target_uuids]
+
+        for path, ifaces in self.manager.GetManagedObjects().items():
+            if not path.startswith(self.device_path):
+                continue
+
+            char = ifaces.get("org.bluez.GattCharacteristic1", {})
+            uuid = char.get("UUID", "").lower()
+            if uuid in target_uuids:
+                proxy = self.bus.get("org.bluez", path)
+                print("should notify")
+                proxy.StartNotify()
+
     def read_characteristic(self):
         if not self.device_path or not self.target_uuids:
             raise BluetoothConnectionError(
@@ -218,6 +242,7 @@ class BluetoothConnectionManager:
                 log.debug(
                     f"[BluetoothConnectionManager::read_characteristic] UUID={uuid} → {list(bytes(value))}"
                 )
+                #print(value)
                 return value
 
         log.warning(
@@ -228,7 +253,9 @@ class BluetoothConnectionManager:
     def get_data(self) -> Optional[str]:
         if self.connected:
             try:
-                return self.read_characteristic()
+                #return self.read_characteristic()
+                #self.subscribe_notification()
+                return [0 for i in range(13)]
             except GLib.GError as e:
                 log.error(
                     "[BluetoothConnectionManager::get_data] Failed to "

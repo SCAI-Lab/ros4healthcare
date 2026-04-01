@@ -1,12 +1,19 @@
 from bleak import BleakClient
 import asyncio
-import logging as log
+import logging
+import sys
 import time
 import numpy as np
 import math
 from ros4hc_msgs.msg import HR
 from geometry_msgs.msg import Vector3Stamped
 
+logging.basicConfig(
+    stream=sys.stdout,
+    format='[%(levelname)s] %(message)s',
+    level=logging.INFO
+)
+log = logging.getLogger(__name__)
 
 class PolarH10:
     HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
@@ -38,7 +45,6 @@ class PolarH10:
         self.ecg_stream_times = []
         self.ibi_stream_values = []
         self.ibi_stream_times = []
-
         if publish_acceleration:
             self.pub_acc = self.node.create_publisher(Vector3Stamped, "polar_acc", 10)
         if publish_hr:
@@ -48,10 +54,9 @@ class PolarH10:
 
     async def connect(self):
         try:
-            self.bleak_client = BleakClient(self.bleak_device, adapter=self.bt_adapter)
+            self.bleak_client = BleakClient(self.bleak_device, adapter=self.bt_adapter, disconnected_callback = self.handle_disconnect)
             await self.bleak_client.connect(timeout=20.0)
-            print("Connected!")
-            self.bleak_client.set_disconnected_callback(self.handle_disconnect)
+            log.info("Connected!")
         except asyncio.TimeoutError:
             log.error("[PolarH10::connect] Connection failed. Retrying...")
             await self.connect()
@@ -63,20 +68,20 @@ class PolarH10:
     async def disconnect(self):
         if self.bleak_client and self.bleak_client.is_connected:
             await self.bleak_client.disconnect()
-            print("Disconnected.")
+            log.info("Disconnected.")
 
     async def start_combined_stream(self):
         await self.bleak_client.write_gatt_char(self.PMD_CHAR1_UUID, self.ECG_WRITE, response=True)
         await self.bleak_client.write_gatt_char(self.PMD_CHAR1_UUID, self.ACC_WRITE, response=True)
         await self.bleak_client.start_notify(self.PMD_CHAR2_UUID, self.pmd_data_conv)
         self.combined_streaming_active = True
-        print("Streaming ECG and ACC...")
+        log.info("Streaming ECG and ACC...")
 
     async def stop_combined_stream(self):
         if self.bleak_client and self.bleak_client.is_connected and self.combined_streaming_active:
             try:
                 await self.bleak_client.stop_notify(self.PMD_CHAR2_UUID)
-                print("Stopped streaming ECG and ACC.")
+                log.info("Stopped streaming ECG and ACC.")
             except Exception as e:
                 log.warning(f"[PolarH10] Failed to stop notify: {e}")
             self.combined_streaming_active = False
@@ -84,14 +89,14 @@ class PolarH10:
     async def start_hr_stream(self):
         await self.bleak_client.start_notify(self.HEART_RATE_MEASUREMENT_UUID, self.hr_data_conv)
         self.hr_streaming_active = True
-        print("Started HR stream.")
+        log.info("Started HR stream.")
 
 
     async def stop_hr_stream(self):
         if self.bleak_client and self.bleak_client.is_connected and self.hr_streaming_active:
             try:
                 await self.bleak_client.stop_notify(self.HEART_RATE_MEASUREMENT_UUID)
-                print("Stopped HR stream.")
+                log.info("Stopped HR stream.")
             except Exception as e:
                 log.warning(f"[PolarH10] Failed to stop HR notify: {e}")
             self.hr_streaming_active = False
@@ -116,7 +121,7 @@ class PolarH10:
         if self.publish_hr:
             hr_msg = HR()
             hr_msg.hr = hr
-            hr_msg.header.header.stamp = self.node.get_clock().now().to_msg()
+            hr_msg.header.stamp = self.node.get_clock().now().to_msg()
             self.pub_hr.publish(hr_msg)
 
         if (flags >> 3) & 1:  # Skip energy exp

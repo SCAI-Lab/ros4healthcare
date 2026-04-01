@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging as log
+import logging
+import sys
 import rclpy
+
+logging.basicConfig(
+    stream=sys.stdout,
+    format='[%(levelname)s] %(message)s',
+    level=logging.INFO
+)
+log = logging.getLogger(__name__)
 
 from sensomative_ros.sensomative_ros import SensomativeRos
 
@@ -26,7 +34,7 @@ def main():
         type=str,
         nargs="+",
         default=[
-            "000055c0-0000-1000-8000-00805f9b34fb",
+#            "000055c0-0000-1000-8000-00805f9b34fb",
             "000055c2-0000-1000-8000-00805f9b34fb",
         ],
         help="List of target GATT characteristic UUIDs",
@@ -38,7 +46,7 @@ def main():
     node = SensomativeRos(
         regex_pattern=args.regex_pattern,
         adapter=args.adapter,
-        mac_address=args.mac_address,
+        mac_address="CC:CC:CC:0A:39:C0",
         target_uuids=args.target_uuids,
     )
 

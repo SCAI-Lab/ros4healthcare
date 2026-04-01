@@ -1,0 +1,23 @@
+polar_connector1:
+  ros__parameters:
+    publish_acceleration: False
+    publish_hr: True
+    publish_ecg: False
+    bluetooth_adapter: "hci1"
+    bluetooth_address: "A0:9E:1A:E8:17:4B"
+
+polar_connector:
+  ros__parameters:
+    publish_acceleration: False
+    publish_hr: True
+    publish_ecg: False
+    bluetooth_adapter: "hci1"
+    bluetooth_address: "A0:9E:1A:E8:17:4B"
+
+polar_connector2:
+  ros__parameters:
+    publish_acceleration: False
+    publish_hr: True
+    publish_ecg: False
+    bluetooth_adapter: "hci1"
+    bluetooth_address: "A0:9E:1A:EB:9F:D0"

@@ -33,6 +33,7 @@ def find_first_matching_device(device_list: Dict[str, Any], pattern: Pattern, ma
     for path, props in device_list.items():
         name = props["org.bluez.Device1"].get("Name", "")
         mac = props["org.bluez.Device1"].get("Address", "")
+        print(mac, mac_address)
         if pattern.match(name) and (mac_address is None or mac_address == mac):
             return BluetoothDevice(path=path, properties=props)
     return None
