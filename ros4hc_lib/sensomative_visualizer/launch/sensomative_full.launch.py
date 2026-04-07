@@ -20,6 +20,22 @@ def generate_launch_description():
         output='screen'
     )
 
+    visualiser_node = Node(
+        package='sensomative_visualizer',
+        name='pressure_visualizer',
+        executable='visualizer',
+        parameters=[{
+            'input_topic': '/pressure1',
+            'output_topic': '/pressure_visualizer',
+            'array_width': 50,
+            'array_height': 50,
+            'smoothing_sigma': 3.0,
+            'debug_mode': False
+        }],
+        output='screen'
+    )
+
     ld.add_action(sensomative_node)
+    ld.add_action(visualiser_node)
 
     return ld

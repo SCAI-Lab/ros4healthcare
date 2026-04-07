@@ -75,7 +75,7 @@ class BluetoothConnectionManager:
         self._disconnect()
         if self.loop.is_running():
             self.loop.quit()
-    
+
         if self._loop_thread is not None:
             self._loop_thread.join()
 
@@ -205,7 +205,6 @@ class BluetoothConnectionManager:
         )
 
     def subscribe_notification(self):
-        print("trying to subscribe")
         if not self.device_path or not self.target_uuids:
             raise BluetoothConnectionError(
                 "[subscribe_notification] Device or UUID not set."
@@ -220,7 +219,6 @@ class BluetoothConnectionManager:
             uuid = char.get("UUID", "").lower()
             if uuid in target_uuids:
                 proxy = self.bus.get("org.bluez", path)
-                print("should notify")
                 proxy.StartNotify()
 
     def read_characteristic(self):
@@ -242,7 +240,6 @@ class BluetoothConnectionManager:
                 log.debug(
                     f"[BluetoothConnectionManager::read_characteristic] UUID={uuid} → {list(bytes(value))}"
                 )
-                #print(value)
                 return value
 
         log.warning(
@@ -253,9 +250,7 @@ class BluetoothConnectionManager:
     def get_data(self) -> Optional[str]:
         if self.connected:
             try:
-                #return self.read_characteristic()
-                #self.subscribe_notification()
-                return [0 for i in range(13)]
+                return self.read_characteristic()
             except GLib.GError as e:
                 log.error(
                     "[BluetoothConnectionManager::get_data] Failed to "
