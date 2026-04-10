@@ -1,0 +1,5 @@
+python3-plotly:
+  ubuntu:
+    focal: [python3-plotly]
+    jammy: [python3-plotly]
+    noble: [python3-plotly]

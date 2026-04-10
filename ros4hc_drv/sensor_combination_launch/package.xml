@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>sensor_combination_launch</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="jorge.penaqueralta@hest.ethz.ch">ubuntu</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_export_depend>python3-setuptools</buildtool_export_depend>
+
+  <exec_depend>rclpy</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

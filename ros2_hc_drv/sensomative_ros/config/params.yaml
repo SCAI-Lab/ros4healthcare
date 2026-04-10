@@ -1,5 +1,0 @@
-sensomative_ros:
-  ros__parameters:
-    # mac_add: "CC:CC:CC:0A:39:C7" #C7"
-    mac_add: "CC:CC:CC:0A:39:9E"
-    hci_mac: "00:1A:7D:DA:71:12"

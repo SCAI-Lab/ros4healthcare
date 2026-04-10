@@ -1,0 +1,37 @@
+<package format="2">
+  <name>dashboard</name>
+  <version>0.0.1</version>
+  <description>A Python GUI plugin for introspecting available ROS message types.
+  Note that the msgs available through this plugin is the ones that are stored
+  on your machine, not on the ROS core your rqt instance connects to.
+  </description>
+
+  <maintainer email="ricardo.manriquez@gmail.com">Ricardo Manríquez</maintainer>
+
+  <license>BSD</license>
+
+  <url type="website">http://localhost</url>
+  <url type="repository">https://localhost</url>
+  <url type="bugtracker">https://github.com/ros-visualization/rqt_msg/issues</url>
+
+  <author>Ricardo Manriquez</author>
+  <author email="ricardo.manriquez@gmail.com">Ricardo Manríquez</author>
+
+  <buildtool_export_depend>python3-setuptools</buildtool_export_depend>
+
+  <exec_depend version_gte="0.2.19">python_qt_binding</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rqt_gui</exec_depend>
+  <exec_depend>rqt_gui_py</exec_depend>
+  <exec_depend>rqt_py_common</exec_depend>
+  <exec_depend>rqt_console</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+
+  <export>
+    <architecture_independent/>
+    <rqt_gui plugin="${prefix}/plugindash.xml"/>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

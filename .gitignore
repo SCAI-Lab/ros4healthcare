@@ -27,6 +27,9 @@ hs_err_pid*
 /install/
 /log/
 
+# Python cache
+__pycache__/
+
 # IDE specific files and directories
 .vscode/
 .idea/
