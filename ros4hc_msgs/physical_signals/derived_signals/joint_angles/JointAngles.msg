@@ -1,0 +1,8 @@
+std_msgs/Header header
+
+float32 hip_flexion
+float32 hip_abduction
+float32 hip_endo
+float32 knee_flexion
+float32 ankle_flexion
+float32 ankle_supination
