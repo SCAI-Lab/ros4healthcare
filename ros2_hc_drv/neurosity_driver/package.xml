@@ -10,7 +10,7 @@
   <depend>rclpy</depend>
   <depend>healthcare_msgs</depend>
   <exec_depend>python-dotenv</exec_depend>
-  <exec_depend>neurosity-sdk</exec_depend>
+  <exec_depend>neurosity</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
