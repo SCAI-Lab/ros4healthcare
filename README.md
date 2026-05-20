@@ -32,7 +32,7 @@ Now clone the repo into our workspace
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-git clone --recurse-submodules https://github.com/ricardo-manriquez/ros4healthcare
+git clone --recurse-submodules https://github.com/ros-healthcare/ros4healthcare
 cd ~/ros4healthcare
 ```
 ### **Build `ros4hc_msgs` and `ros4hc_drv`**
@@ -86,7 +86,7 @@ We then need to clone the repositories into our workspace
 
 ```bash
 cd ros2_ws/src
-git clone --recurse-submodules https://github.com/ricardo-manriquez/ros4healthcare
+git clone --recurse-submodules https://github.com/ros-healthcare/ros4healthcare
 cd ..
 ```
 then build and source the workspace 
