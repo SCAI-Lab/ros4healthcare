@@ -9,6 +9,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.utilities import remove_ros_args
 from std_msgs.msg import Int32, Float32MultiArray, Float32
+from geometry_msgs.msg import Vector3Stamped
+from ros2_hc_msgs.msg import HR, RR, EDA
 
 from corsano_ros.corsano_driver import CorsanoDriver
 from corsano_ros.helpers import load_config
@@ -83,11 +85,12 @@ class CorsanoRosWrapper(Node):
         self._enable_bioz_streaming()
 
         # --- ROS publishers ---
-        self.hr_pub = self.create_publisher(Int32, "corsano/hr", 10)
-        self.rr_pub = self.create_publisher(Int32, "corsano/rr", 10)
-        self.bioz_pub = self.create_publisher(Float32MultiArray, "corsano/bioz", 10)
-        self.bioz_pub2 = self.create_publisher(Float32, "corsano/bioz_val", 10)
-        self.accel_pub = self.create_publisher(Float32MultiArray, "corsano/acceleration", 10)
+        self.hr_pub = self.create_publisher(HR, "corsano/hr", 10)
+        self.rr_pub = self.create_publisher(RR, "corsano/rr", 10)
+        self.bioz_pub = self.create_publisher(EDA, "corsano/bioz", 10)
+        # Single-value bioz publisher (wrapped in EDA message with single-sample array)
+        self.bioz_pub2 = self.create_publisher(EDA, "corsano/bioz_val", 10)
+        self.accel_pub = self.create_publisher(Vector3Stamped, "corsano/acceleration", 10)
         self.stress_pub = self.create_publisher(Float32MultiArray, "corsano/stress", 10)
 
         # --- Timer for periodic polling ---
@@ -115,35 +118,56 @@ class CorsanoRosWrapper(Node):
     def acceleration_callback(self, acceleration: AccelerometerData):
         """Process accelerometer data and publish to ROS topic."""
         if acceleration.x_values.size > 0:
-            msg = Float32MultiArray()
-            msg.data = [
-                float(acceleration.x_values[-1]),
-                float(acceleration.y_values[-1]),
-                float(acceleration.z_values[-1]),
-            ]
+            msg = Vector3Stamped()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.vector.x = float(acceleration.x_values[-1])
+            msg.vector.y = float(acceleration.y_values[-1])
+            msg.vector.z = float(acceleration.z_values[-1])
             self.accel_pub.publish(msg)
             self.get_logger().debug(
-                f"Accel: X={msg.data[0]:.3f}, Y={msg.data[1]:.3f}, Z={msg.data[2]:.3f}"
+                f"Accel: X={msg.vector.x:.3f}, Y={msg.vector.y:.3f}, Z={msg.vector.z:.3f}"
             )
 
     def activity_callback(self, activity: ActivityData):
         """Process activity data and publish HR and RR."""
         if activity is not None:
-            self.hr_pub.publish(Int32(data=activity.hr_filtered))
-            self.rr_pub.publish(Int32(data=int(activity.rr_filtered)))
+            hr_msg = HR()
+            hr_msg.header.header.stamp = self.get_clock().now().to_msg()
+            hr_msg.hr = int(activity.hr_filtered)
+            hr_msg.hr_quality = int(activity.hr_filtered_q)
+            hr_msg.time_signal_recorded = [activity.timestamp.timestamp()]
+            self.hr_pub.publish(hr_msg)
+
+            rr_msg = RR()
+            rr_msg.header.header.stamp = self.get_clock().now().to_msg()
+            rr_msg.rr = float(activity.rr_filtered)
+            rr_msg.rr_quality = int(activity.rr_raw_q)
+            rr_msg.time_signal_recorded = [activity.timestamp.timestamp()]
+            self.rr_pub.publish(rr_msg)
 
     def bioz_callback(self, bioz: BioZData):
         """Process BioZ/EDA data and publish."""
         if bioz.values.size > 0:
-            msg = Float32MultiArray()
-            msg.data = bioz.values.astype(float).tolist()
-            self.bioz_pub.publish(msg)
-            for value in bioz.values.astype(float).tolist():
-                msg2 = Float32()
-                msg2.data = value
-                self.bioz_pub2.publish(msg2)
-        print(bioz)
+            # 1. PRE-COMPUTED FIELDS: Compute timestamp and convert values once per packet
+            current_time_msg = self.get_clock().now().to_msg()
+            float_values = bioz.values.astype(float).tolist()
 
+            # --- Bulk Publish ---
+            msg = EDA()
+            msg.header.header.stamp = current_time_msg
+            msg.eda = float_values
+            self.bioz_pub.publish(msg)
+            self.get_logger().info(f"[BioZ] Published packet index={bioz.record_index}, ts={bioz.timestamp}ms, samples={len(msg.eda)}")
+
+            # --- Single-Sample Publish ---
+            # 2. OBJECT REUSE: Create the message structure only once
+            msg2 = EDA()
+            msg2.header.header.stamp = current_time_msg
+
+            # 3. LEAN LOOP: Only update the exact field that changes
+            for value in float_values:
+                msg2.eda = [value]
+                self.bioz_pub2.publish(msg2)
     def stress_callback(self, stress: StressData):
         """Process StressData and publish to ROS topic."""
         if stress is not None:

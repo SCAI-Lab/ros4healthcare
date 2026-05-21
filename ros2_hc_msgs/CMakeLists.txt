@@ -45,6 +45,10 @@ set(msg_files
 "msg/biosensing/raw_biosignals/icg/ICGLeads.msg"
 "msg/biosensing/raw_biosignals/eog/EOGHeader.msg"
 "msg/biosensing/raw_biosignals/eog/EOG.msg"
+"msg/biosensing/raw_biosignals/eye/PupilGaze.msg"
+"msg/biosensing/derived_biosignals/eye/Blink.msg"
+"msg/biosensing/derived_biosignals/eye/Fixation.msg"
+"msg/biosensing/derived_biosignals/eye/Saccade.msg"
 
 "msg/physical_sensors/external_signals/force/Force.msg"
 "msg/physical_sensors/external_signals/pressure/Pressure.msg"
