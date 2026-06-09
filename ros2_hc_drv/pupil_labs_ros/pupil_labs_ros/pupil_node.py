@@ -18,14 +18,13 @@ from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
 
 from pupil_labs.realtime_api.simple import discover_one_device
+from pupil_labs.realtime_api import DeviceError
+from rclpy.exceptions import ROSInterruptException
 from pupil_labs.realtime_api.streaming.eye_events import (
     BlinkEventData,
     FixationEventData,
+    FixationOnsetEventData,
 )
-
-# Workaround for https://github.com/opencv/opencv/issues/21952
-cv2.imshow("cv/av bug", np.zeros(1))
-cv2.destroyAllWindows()
 
 class PupilLabsFullDriver(Node):
     def __init__(self):
@@ -45,13 +44,13 @@ class PupilLabsFullDriver(Node):
         # ==========================================
         # 1. PUBLISHERS (Data Streams)
         # ==========================================
-        self.gaze_pub_ = self.create_publisher(PupilGaze, 'biosensing/raw_biosignals/eye/pupil_gaze', 10)
-        self.blink_pub_ = self.create_publisher(Blink, 'biosensing/derived_biosignals/eye/blink', 10)
-        self.fixation_pub_ = self.create_publisher(Fixation, 'biosensing/derived_biosignals/eye/fixation', 10)
-        self.saccade_pub_ = self.create_publisher(Saccade, 'biosensing/derived_biosignals/eye/saccade', 10)
+        self.gaze_pub_ = self.create_publisher(PupilGaze, 'biosensing/raw_biosignals/oculometrics/pupil_gaze', 10)
+        self.blink_pub_ = self.create_publisher(Blink, 'biosensing/derived_biosignals/oculometrics/blink', 10)
+        self.fixation_pub_ = self.create_publisher(Fixation, 'biosensing/derived_biosignals/oculometrics/fixation', 10)
+        self.saccade_pub_ = self.create_publisher(Saccade, 'biosensing/derived_biosignals/oculometrics/saccade', 10)
         
-        self.imu_pub_   = self.create_publisher(Imu, 'biosensing/raw_biosignals/imu/head_movement', qos_profile_sensor_data)
-        self.video_pub_ = self.create_publisher(Image, 'biosensing/raw_biosignals/eye/scene_camera', qos_profile_sensor_data)
+        self.imu_pub_   = self.create_publisher(Imu, 'biosensing/raw_biosignals/imu/head_movement', 10)
+        self.video_pub_ = self.create_publisher(Image, 'biosensing/raw_biosignals/oculometrics/scene_camera', qos_profile_sensor_data)
         self.battery_pub_ = self.create_publisher(Float32, 'hardware/biosensors/device/battery_level', 1)
 
         # ==========================================
@@ -64,14 +63,14 @@ class PupilLabsFullDriver(Node):
         # ==========================================
         # 3. BACKGROUND THREADS (Blocking API Calls)
         # ==========================================
-        threads = [
+        self._threads = [
             threading.Thread(target=self.stream_gaze),
             threading.Thread(target=self.stream_video),
             threading.Thread(target=self.stream_events),
             threading.Thread(target=self.stream_imu)
         ]
-        
-        for t in threads:
+
+        for t in self._threads:
             t.daemon = True
             t.start()
 
@@ -114,7 +113,7 @@ class PupilLabsFullDriver(Node):
                 msg.eyelid_aperture_right = float(gaze.eyelid_aperture_right)
                 
                 self.gaze_pub_.publish(msg)
-        except Exception as e:
+        except (DeviceError, ROSInterruptException) as e:
             self.get_logger().error(f"Gaze stream stopped: {e}")
 
     def stream_video(self):
@@ -150,47 +149,39 @@ class PupilLabsFullDriver(Node):
                 
                 self.video_pub_.publish(image_msg)
 
-        except Exception as e:
+        except (DeviceError, ROSInterruptException) as e:
             self.get_logger().error(f"Matched video stream stopped: {e}")
 
     def stream_events(self):
-        """Asynchronous stream for Blinks, Fixations, and Saccades."""
+        """Blocking stream for Blinks, Fixations, and Saccades."""
         try:
             while rclpy.ok():
                 eye_event = self.device.receive_eye_events()
-                
-                # --- PROCESS BLINKS ---
-                if isinstance(eye_event, BlinkEventData):
-                    duration_sec = (eye_event.end_time_ns - eye_event.start_time_ns) / 1e9
-                    
-                    # Exact hardware start time for the ROS header
-                    ts_sec = eye_event.rtp_ts_unix_seconds
-                    ros_sec = int(ts_sec)
-                    ros_nanosec = int((ts_sec - ros_sec) * 1e9)
+                match eye_event:
+                    case FixationOnsetEventData():
+                        pass  # Onset only, no duration yet — skip
 
-                    msg = Blink()
-                    msg.header.stamp.sec = ros_sec
-                    msg.header.stamp.nanosec = ros_nanosec
-                    msg.header.frame_id = "pupil_glasses"
+                    case BlinkEventData():
+                        duration_sec = (eye_event.end_time_ns - eye_event.start_time_ns) / 1e9
+                        ts_sec = eye_event.rtp_ts_unix_seconds
+                        ros_sec = int(ts_sec)
+                        ros_nanosec = int((ts_sec - ros_sec) * 1e9)
+                        msg = Blink()
+                        msg.header.stamp.sec = ros_sec
+                        msg.header.stamp.nanosec = ros_nanosec
+                        msg.header.frame_id = "pupil_glasses"
                     
-                    msg.duration = float(duration_sec)
-                    msg.start_time_ns = int(eye_event.start_time_ns)
-                    msg.end_time_ns = int(eye_event.end_time_ns)
-                    
-                    self.blink_pub_.publish(msg)
-                    self.get_logger().info(f"[BLINK] Duration: {duration_sec:.3f}s")
+                        msg.duration = float(duration_sec)
+                        msg.start_time_ns = int(eye_event.start_time_ns)
+                        msg.end_time_ns = int(eye_event.end_time_ns)
+                        self.blink_pub_.publish(msg)
+                        self.get_logger().info(f"[BLINK] Duration: {duration_sec:.3f}s")
 
-
-                # --- PROCESS FIXATIONS & SACCADES ---
-                elif isinstance(eye_event, FixationEventData):
-                    duration_sec = (eye_event.end_time_ns - eye_event.start_time_ns) / 1e9
-                    
-                    ts_sec = eye_event.rtp_ts_unix_seconds
-                    ros_sec = int(ts_sec)
-                    ros_nanosec = int((ts_sec - ros_sec) * 1e9)
-
-                    # FIXATION (Type 1)
-                    if eye_event.event_type == 1:
+                    case FixationEventData() if eye_event.event_type == 1:
+                        duration_sec = (eye_event.end_time_ns - eye_event.start_time_ns) / 1e9
+                        ts_sec = eye_event.rtp_ts_unix_seconds
+                        ros_sec = int(ts_sec)
+                        ros_nanosec = int((ts_sec - ros_sec) * 1e9)
                         msg = Fixation()
                         msg.header.stamp.sec = ros_sec
                         msg.header.stamp.nanosec = ros_nanosec
@@ -199,7 +190,6 @@ class PupilLabsFullDriver(Node):
                         msg.duration = float(duration_sec)
                         msg.start_time_ns = int(eye_event.start_time_ns)
                         msg.end_time_ns = int(eye_event.end_time_ns)
-                        
                         msg.start_gaze_x = float(eye_event.start_gaze_x)
                         msg.start_gaze_y = float(eye_event.start_gaze_y)
                         msg.end_gaze_x = float(eye_event.end_gaze_x)
@@ -210,21 +200,20 @@ class PupilLabsFullDriver(Node):
                         msg.amplitude_angle_deg = float(eye_event.amplitude_angle_deg)
                         msg.mean_velocity = float(eye_event.mean_velocity)
                         msg.max_velocity = float(eye_event.max_velocity)
-                        
                         self.fixation_pub_.publish(msg)
-                        self.get_logger().info(f"[FIXATION] Duration: {duration_sec:.2f} seconds.")
 
-                    # SACCADE (Type 0)
-                    elif eye_event.event_type == 0:
+                    case FixationEventData() if eye_event.event_type == 0:
+                        duration_sec = (eye_event.end_time_ns - eye_event.start_time_ns) / 1e9
+                        ts_sec = eye_event.rtp_ts_unix_seconds
+                        ros_sec = int(ts_sec)
+                        ros_nanosec = int((ts_sec - ros_sec) * 1e9)
                         msg = Saccade()
                         msg.header.stamp.sec = ros_sec
                         msg.header.stamp.nanosec = ros_nanosec
                         msg.header.frame_id = "pupil_glasses"
-                        
                         msg.duration = float(duration_sec)
                         msg.start_time_ns = int(eye_event.start_time_ns)
                         msg.end_time_ns = int(eye_event.end_time_ns)
-                        
                         msg.start_gaze_x = float(eye_event.start_gaze_x)
                         msg.start_gaze_y = float(eye_event.start_gaze_y)
                         msg.end_gaze_x = float(eye_event.end_gaze_x)
@@ -235,13 +224,9 @@ class PupilLabsFullDriver(Node):
                         msg.amplitude_angle_deg = float(eye_event.amplitude_angle_deg)
                         msg.mean_velocity = float(eye_event.mean_velocity)
                         msg.max_velocity = float(eye_event.max_velocity)
-
                         self.saccade_pub_.publish(msg)
-                        self.get_logger().info(
-                            f"[SACCADE] Amplitude: {msg.amplitude_angle_deg:.1f}° | Max Vel: {msg.max_velocity:.0f} pixels/deg"
-                        )
 
-        except Exception as e:
+        except (DeviceError, ROSInterruptException) as e:
             self.get_logger().error(f"Event thread stopped: {e}")
 
     def stream_imu(self):
@@ -277,7 +262,7 @@ class PupilLabsFullDriver(Node):
                 msg.orientation.w = float(imu_data.quaternion.w)
                 
                 self.imu_pub_.publish(msg)
-        except Exception as e:
+        except (DeviceError, ROSInterruptException) as e:
             self.get_logger().error(f"IMU thread stopped: {e}")
 
     # ---------------------------------------------------------
@@ -288,7 +273,7 @@ class PupilLabsFullDriver(Node):
             battery = Float32()
             battery.data = float(self.device.battery_level_percent)
             self.battery_pub_.publish(battery)
-        except Exception as e:
+        except DeviceError as e:
             self.get_logger().warning(f"Could not read battery: {e}")
 
     def start_recording_cb(self, request, response):
@@ -297,7 +282,7 @@ class PupilLabsFullDriver(Node):
             response.success = True
             response.message = f"Recording started on phone with ID: {rec_id}"
             self.get_logger().info(response.message)
-        except Exception as e:
+        except DeviceError as e:
             response.success = False
             response.message = f"Failed to start recording: {str(e)}"
         return response
@@ -308,7 +293,7 @@ class PupilLabsFullDriver(Node):
             response.success = True
             response.message = "Recording stopped and saved successfully."
             self.get_logger().info(response.message)
-        except Exception as e:
+        except DeviceError as e:
             response.success = False
             response.message = f"Failed to stop recording: {str(e)}"
         return response
@@ -317,24 +302,31 @@ class PupilLabsFullDriver(Node):
         try:
             self.device.send_event(msg.data, event_timestamp_unix_ns=int(time.time() * 1e9))
             self.get_logger().info(f"Injected Timeline Event: {msg.data}")
-        except Exception as e:
+        except DeviceError as e:
             self.get_logger().error(f"Failed to send event: {e}")
 
-    def destroy_node(self):
+    # ---------------------------------------------------------
+    # CONTEXT MANAGEMENT
+    # ---------------------------------------------------------
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for t in self._threads:
+            t.join(timeout=2.0)
         if self.device:
             self.device.close()
-        super().destroy_node()
+        self.destroy_node()
+        return False
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PupilLabsFullDriver()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    with PupilLabsFullDriver() as node:
+        try:
+            rclpy.spin(node)
+        except KeyboardInterrupt:
+            pass
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
