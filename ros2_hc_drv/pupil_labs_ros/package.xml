@@ -5,7 +5,8 @@
   <version>0.0.0</version>
   <description>ROS 2 driver for Pupil Labs glasses</description>
   <maintainer email="mooeyad@gmail.com">Mohamed Eyad</maintainer>
-  <license>MIT</license> <depend>rclpy</depend>
+  <license>MIT</license>
+  <depend>rclpy</depend>
   <depend>ros2_hc_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
