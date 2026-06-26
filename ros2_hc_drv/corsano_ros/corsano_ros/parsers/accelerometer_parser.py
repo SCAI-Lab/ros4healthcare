@@ -2,7 +2,7 @@ from __future__ import annotations
 from logging import warning
 from dataclasses import dataclass
 from datetime import timezone
-from typing import Optional, Tuple
+from typing import Optional
 import numpy as np
 
 
@@ -43,10 +43,13 @@ class AccelerometerParser:
     ACC_SR: int = 32  # Sampling rate in Hz (samples per second)
 
     def __init__(self, time_zone: timezone = timezone.utc) -> None:
-        self.acc_time: float = 0.0
+        from datetime import datetime
+        self.acc_time: float = datetime.now(tz=time_zone).timestamp() * 1000.0
         self.time_zone: timezone = time_zone
         self.normalize: bool = False
         self.last_index: Optional[int] = None
+        from logging import debug
+        debug(f"[AccelerometerParser] Initialized acc_time={self.acc_time:.3f} ms (Unix epoch)")
 
     def process_metric_array(
         self,
@@ -54,20 +57,10 @@ class AccelerometerParser:
         processed_index: int,
         metric_id: int,
         metric_size: int
-    ) -> Tuple[int, Optional[AccelerometerData]]:
+    ) -> Optional[AccelerometerData]:
         """
-        Process a metric array and return parsed accelerometer data.
-
-        Args:
-            metric_array: The raw binary array of metric data.
-            processed_index: The current index within the array.
-            metric_id: Identifier for the metric type (0x2B = accelerometer).
-            metric_size: Total size of this metric in bytes.
-
-        Returns:
-            A tuple containing the updated processed index and an
-            AccelerometerData object if the metric was recognized,
-            or None otherwise.
+        Process a metric array and return parsed accelerometer data,
+        or None if the metric_id is not recognised.
         """
         if metric_id != 0x2B:
             warning(
@@ -83,7 +76,7 @@ class AccelerometerParser:
         metric_array: bytes,
         processed_index: int,
         metric_size: int
-    ) -> Tuple[int, AccelerometerData]:
+    ) -> AccelerometerData:
         """Decode an accelerometer metric packet into structured data."""
         # --- Parse 4-byte header ---
         index = metric_array[processed_index]
@@ -142,7 +135,15 @@ class AccelerometerParser:
         )
 
         # Update timestamp
-        self.acc_time += num_samples * 1000.0 / self.ACC_SR
+        step_ms = num_samples * 1000.0 / self.ACC_SR
+        from logging import debug
+        from datetime import datetime
+        readable = datetime.fromtimestamp(self.acc_time / 1000.0).isoformat()
+        debug(
+            f"[AccelerometerParser] packet index={index}, num_samples={num_samples}, "
+            f"timestamp_ms={self.acc_time:.3f} ({readable}), next_step={step_ms:.3f} ms"
+        )
+        self.acc_time += step_ms
         return data
 
     def reset(self) -> None:

@@ -128,6 +128,42 @@ class CorsanoDriver:
         for cmd in commands:
             self.commands[cmd.cmd] = cmd()
 
+    def _set_connection_interval(self):
+        """
+        Ask the kernel to negotiate a short BLE connection interval (10–15 ms).
+        Shorter intervals mean our 410-byte file transfers complete in ~200 ms
+        instead of 600+ ms, which keeps the D-Bus event loop from falling behind
+        and triggering SimpleBLE's D-Bus timeout.
+        Requires the hcitool lecup command (part of bluez-tools).
+        """
+        try:
+            result = subprocess.check_output(
+                ["sudo", "hcitool", "con"], stderr=subprocess.DEVNULL
+            ).decode()
+            handle = None
+            addr_upper = self.address.upper()
+            for line in result.splitlines():
+                if addr_upper in line.upper():
+                    parts = line.split()
+                    # hcitool con output: "< LE address handle ..."
+                    for i, p in enumerate(parts):
+                        if p.upper() == addr_upper and i + 1 < len(parts):
+                            handle = parts[i + 1]
+                            break
+            if handle is None:
+                warning("[CorsanoDriver] Could not find connection handle for lecup")
+                return
+            subprocess.check_output(
+                ["sudo", "hcitool", "lecup",
+                 "--handle", handle,
+                 "--min", "8", "--max", "12",
+                 "--latency", "0", "--timeout", "300"],
+                stderr=subprocess.DEVNULL,
+            )
+            info(f"[CorsanoDriver] Set BLE connection interval (handle={handle})")
+        except Exception as e:
+            warning(f"[CorsanoDriver] Could not set connection interval: {e}")
+
     # ---------------------------------------------------------------------
     # Connection Handling
     # ---------------------------------------------------------------------
@@ -162,6 +198,7 @@ class CorsanoDriver:
                     self._connected_event.set()
                     self.connected = True
                     info(f"[CorsanoDriver] Connected to {self.address}")
+                    self._set_connection_interval()
             except RuntimeError:
                 error(f"[CorsanoDriver] Connection failed, retrying ({attempt + 1}/2)...")
                 attempt += 1
@@ -200,9 +237,10 @@ class CorsanoDriver:
     # ---------------------------------------------------------------------
     def _on_file_data(self, data: bytes):
         """Callback invoked when file data is received."""
-        if self.buffer:
+        buf = self.buffer
+        if buf is not None and not buf.closed:
             self._start_tx = True
-            self.buffer.write(data)
+            buf.write(data)
 
     def _on_command_data(self, data: bytes):
         """Callback invoked when command data is received."""
@@ -270,6 +308,20 @@ class CorsanoDriver:
             ppgfreq=PLAN_FREQUENCY["FREQ_512HZ"],
             actfreq=1,
         )
+
+    def reset_adapter(self):
+        """
+        Hard-reset the HCI adapter to clear a stuck BLE state (e.g. after a
+        D-Bus timeout that leaves the notification channel permanently broken).
+        Sets connected=False so the monitor thread triggers a full reconnect.
+        """
+        try:
+            subprocess.check_output(self.hci_reset_command, shell=True)
+            info("[CorsanoDriver] HCI adapter reset.")
+        except Exception as e:
+            warning(f"[CorsanoDriver] HCI reset failed: {e}")
+        finally:
+            self.connected = False
 
     def get_buffer(self):
         """Return and reset the internal transmission buffer."""

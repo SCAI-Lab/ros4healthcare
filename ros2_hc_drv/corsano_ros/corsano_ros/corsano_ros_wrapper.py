@@ -2,33 +2,19 @@
 
 import argparse
 import sys
+import traceback
 from logging import error
-from datetime import datetime
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
 from rclpy.utilities import remove_ros_args
-from std_msgs.msg import Int32, Float32MultiArray, Float32
+from sensor_msgs.msg import Imu
 
 from corsano_ros.corsano_driver import CorsanoDriver
 from corsano_ros.helpers import load_config
-from corsano_ros.retrieve_data import (
-    get_last_activity_data,
-    get_last_bioz_data,
-    get_last_stress_data,
-    get_last_accelerometer_data,
-    dump_bioz_file,
-)
-from corsano_ros.commands import (
-    VENDOR_CMD_FD53,
-    VENDOR_CMD_FD7D,
-    VENDOR_CMD_FC2D,
-    VENDOR_CMD_FD57,
-)
-from corsano_ros.parsers.accelerometer_parser import AccelerometerData
-from corsano_ros.parsers.activity_parser import ActivityData
-from corsano_ros.parsers.bioz_parser import BioZData
-from corsano_ros.parsers.stress_parser import StressData
+from corsano_ros.retrieve_data import get_new_accelerometer_data
+from corsano_ros.parsers.accelerometer_parser import AccelerometerData, AccelerometerParser
 
 
 def parse_args():
@@ -56,7 +42,9 @@ def parse_args():
 
 
 class CorsanoRosWrapper(Node):
-    """ROS 2 wrapper around the CorsanoDriver BLE interface."""
+    """ROS 2 wrapper — streams accelerometer data, polling only when the ACC file grows."""
+
+    _MAX_ACCEL_MS2 = 8.0 * 9.80665  # physical limit: ±8 g
 
     def __init__(self, driver: CorsanoDriver):
         super().__init__("corsano_wrapper")
@@ -71,158 +59,128 @@ class CorsanoRosWrapper(Node):
 
         # --- Map commands ---
         type_to_command = {type(v).__name__: v for v in driver.commands.values()}
-        self.cmd_get_file_size = type_to_command.get("CMD_GET_FILE_SIZE")
-        self.cmd_stream_file_with_size = type_to_command.get(
-            "CMD_START_STREAMING_FILE_WITH_SIZE"
-        )
-        self.cmd_stream_file_with_size_offset = type_to_command.get(
-            "CMD_START_STREAMING_FILE_WITH_SIZE_OFFSET"
-        )
+        required = [
+            "CMD_GET_FILE_SIZE",
+            "CMD_START_STREAMING_FILE_WITH_SIZE",
+            "CMD_START_STREAMING_FILE_WITH_SIZE_OFFSET",
+        ]
+        for name in required:
+            if name not in type_to_command:
+                raise RuntimeError(f"Driver is missing required command: {name}")
+        self.cmd_get_file_size = type_to_command["CMD_GET_FILE_SIZE"]
+        self.cmd_stream_file_with_size = type_to_command["CMD_START_STREAMING_FILE_WITH_SIZE"]
+        self.cmd_stream_file_with_size_offset = type_to_command["CMD_START_STREAMING_FILE_WITH_SIZE_OFFSET"]
 
-        # --- Enable BioZ and sensor streaming ---
-        self._enable_bioz_streaming()
+        # --- ROS publisher ---
+        self.accel_pub = self.create_publisher(Imu, "corsano/acceleration", 10)
 
-        # --- ROS publishers ---
-        self.hr_pub = self.create_publisher(Int32, "corsano/hr", 10)
-        self.rr_pub = self.create_publisher(Int32, "corsano/rr", 10)
-        self.bioz_pub = self.create_publisher(Float32MultiArray, "corsano/bioz", 10)
-        self.bioz_pub2 = self.create_publisher(Float32, "corsano/bioz_val", 10)
-        self.accel_pub = self.create_publisher(Float32MultiArray, "corsano/acceleration", 10)
-        self.stress_pub = self.create_publisher(Float32MultiArray, "corsano/stress", 10)
+        # None = first poll, captures current file position and skips historical data.
+        self._last_acc_size: Optional[int] = None
 
-        # --- Timer for periodic polling ---
-        self.acceleration_timer = self.create_timer(0.1, self.request_accelerometer_data)
-        self.activity_timer = self.create_timer(0.1, self.request_activity_data)
-        self.bioz_timer = self.create_timer(0.01, self.request_bioz_data)
-        self.stress_timer = self.create_timer(0.1, self.request_stress_data)
+        # ACC index-based timestamping
+        self._acc_t0_ms: Optional[float] = None    # wall-clock ms when first chunk arrived
+        self._acc_first_index: Optional[int] = None
+        self._acc_prev_index: Optional[int] = None
+        self._acc_laps: int = 0                    # full 256-chunk rollovers since t0
+
+        self._poll_timer = self.create_timer(2.0, self._poll_loop)
 
         self.get_logger().info("CorsanoWrapper node initialized and ready.")
-        self.dumped_bioz_file = False
-
-    def _enable_bioz_streaming(self):
-        """Enable BioZ recording via vendor commands."""
-        self.get_logger().info("Enabling BioZ streaming...")
-        for cmd_class in [VENDOR_CMD_FD53, VENDOR_CMD_FD7D, VENDOR_CMD_FC2D, VENDOR_CMD_FD57]:
-            try:
-                cmd = cmd_class()
-                packet = cmd.execute()
-                self.driver.write(packet)
-                self.get_logger().info(f"Sent {cmd_class.__name__} ({packet.hex()})")
-            except Exception as e:
-                self.get_logger().warning(f"Failed to send {cmd_class.__name__}: {e}")
 
     # -------------------- Callbacks --------------------
-    def acceleration_callback(self, acceleration: AccelerometerData):
-        """Process accelerometer data and publish to ROS topic."""
-        if acceleration.x_values.size > 0:
-            msg = Float32MultiArray()
-            msg.data = [
-                float(acceleration.x_values[-1]),
-                float(acceleration.y_values[-1]),
-                float(acceleration.z_values[-1]),
-            ]
+
+    def _acc_timestamp_ms(self, index: int) -> float:
+        """Return the wall-clock timestamp (ms) for a chunk given its 0-255 rolling index."""
+        import time as _time
+        now_ms = _time.time() * 1000.0
+        if self._acc_t0_ms is None:
+            self._acc_t0_ms = now_ms
+            self._acc_first_index = index
+            self._acc_prev_index = index
+            self._acc_laps = 0
+            return self._acc_t0_ms
+
+        # Detect rollover: index jumped backward by more than half the range.
+        prev = self._acc_prev_index
+        if prev is not None and index < prev and (prev - index) > 128:
+            self._acc_laps += 1
+        self._acc_prev_index = index
+
+        effective = self._acc_laps * 256 + (index - self._acc_first_index) % 256
+        return self._acc_t0_ms + effective * 1000.0
+
+    def _publish_acceleration(self, acceleration: AccelerometerData):
+        """Validate and publish one packet of accelerometer samples."""
+        import numpy as np
+        if acceleration.x_values.size == 0:
+            return
+
+        limit = self._MAX_ACCEL_MS2
+        any_bad = (
+            (np.abs(acceleration.x_values) > limit) |
+            (np.abs(acceleration.y_values) > limit) |
+            (np.abs(acceleration.z_values) > limit)
+        )
+        n_total = acceleration.x_values.size
+        if any_bad.any():
+            n_publish = int(np.argmax(any_bad))
+            if n_publish == 0:
+                self.get_logger().warning(
+                    f"[Accel] First sample out of range — skipping packet index={acceleration.index}"
+                )
+                return
+            self.get_logger().warning(
+                f"[Accel] Truncating at sample {n_publish}/{n_total} "
+                f"(index={acceleration.index})"
+            )
+        else:
+            n_publish = n_total
+
+        chunk_ts_ms = self._acc_timestamp_ms(acceleration.index)
+        sample_period_ms = 1000.0 / AccelerometerParser.ACC_SR
+        for i in range(n_publish):
+            sample_ts_ms = chunk_ts_ms + i * sample_period_ms
+            msg = Imu()
+            msg.header.frame_id = "corsano_imu"
+            msg.header.stamp.sec = int(sample_ts_ms / 1000)
+            msg.header.stamp.nanosec = int((sample_ts_ms % 1000) * 1e6)
+            msg.linear_acceleration.x = float(acceleration.x_values[i])
+            msg.linear_acceleration.y = float(acceleration.y_values[i])
+            msg.linear_acceleration.z = float(acceleration.z_values[i])
+            msg.orientation_covariance[0] = -1.0
+            msg.angular_velocity_covariance[0] = -1.0
             self.accel_pub.publish(msg)
-            self.get_logger().debug(
-                f"Accel: X={msg.data[0]:.3f}, Y={msg.data[1]:.3f}, Z={msg.data[2]:.3f}"
-            )
 
-    def activity_callback(self, activity: ActivityData):
-        """Process activity data and publish HR and RR."""
-        if activity is not None:
-            self.hr_pub.publish(Int32(data=activity.hr_filtered))
-            self.rr_pub.publish(Int32(data=int(activity.rr_filtered)))
+        self.get_logger().info(
+            f"[Accel] published {n_publish}/{n_total} samples "
+            f"index={acceleration.index} "
+            f"t0={chunk_ts_ms:.0f} ms"
+        )
 
-    def bioz_callback(self, bioz: BioZData):
-        """Process BioZ/EDA data and publish."""
-        if bioz.values.size > 0:
-            msg = Float32MultiArray()
-            msg.data = bioz.values.astype(float).tolist()
-            self.bioz_pub.publish(msg)
-            for value in bioz.values.astype(float).tolist():
-                msg2 = Float32()
-                msg2.data = value
-                self.bioz_pub2.publish(msg2)
-        print(bioz)
+    # -------------------- Poll loop --------------------
 
-    def stress_callback(self, stress: StressData):
-        """Process StressData and publish to ROS topic."""
-        if stress is not None:
-            msg = Float32MultiArray()
-            # Put timestamp first, then selected stress metrics
-            msg.data = [
-                float(stress.timestamp_ms),
-                float(stress.stress_skin),
-                float(stress.stress_skin_quality),
-                float(stress.pczt_min),
-                float(stress.cc),
-            ]
-            self.stress_pub.publish(msg)
-            self.get_logger().debug(
-                f"Stress: ts={msg.data[0]}, skin={msg.data[1]}, quality={msg.data[2]}, "
-                f"pczt_min={msg.data[3]:.2f}, cc={msg.data[4]:.2f}"
-            )
+    def _poll_loop(self):
+        if not self.driver.connected:
+            return
 
-    # -------------------- Request functions --------------------
-    def request_accelerometer_data(self):
-        if self.driver.connected:
-            acc = get_last_accelerometer_data(
+        try:
+            chunks, new_size = get_new_accelerometer_data(
                 self.driver,
                 self.cmd_get_file_size,
                 self.cmd_stream_file_with_size,
                 self.cmd_stream_file_with_size_offset,
+                self._last_acc_size,
             )
-            if acc is not None:
-                self.acceleration_callback(acc)
-
-    def request_activity_data(self):
-        if self.driver.connected:
-            activity = get_last_activity_data(
-                self.driver,
-                self.cmd_get_file_size,
-                self.cmd_stream_file_with_size,
-                self.cmd_stream_file_with_size_offset,
-            )
-            if activity is not None:
-                self.activity_callback(activity)
-
-    def request_bioz_data(self):
-        if self.driver.connected:
-
-            # print("Downloading BIOz file")
-            # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            # filename = f"bioz_raw_2025_11_24.bin"
-            # dump_bioz_file(
-            #     self.driver,
-            #     self.cmd_get_file_size,
-            #     self.cmd_stream_file_with_size,
-            #     self.cmd_stream_file_with_size_offset,
-            #     filename,
-            # )
-            # self.dumped_bioz_file = True
-
-            bioz = get_last_bioz_data(
-                self.driver,
-                self.cmd_get_file_size,
-                self.cmd_stream_file_with_size,
-                self.cmd_stream_file_with_size_offset,
-            )
-            if bioz is not None:
-                self.bioz_callback(bioz)
-
-    def request_stress_data(self):
-        if self.driver.connected:
-            stress = get_last_stress_data(
-                self.driver,
-                self.cmd_get_file_size,
-                self.cmd_stream_file_with_size,
-                self.cmd_stream_file_with_size_offset,
-            )
-            if stress is not None:
-                self.stress_callback(stress)
+            self._last_acc_size = new_size
+            for chunk in chunks:
+                self._publish_acceleration(chunk)
+        except Exception as e:
+            self.get_logger().error(f"[ACC] {type(e).__name__}: {e}")
+            traceback.print_exc()
 
     # -------------------- Cleanup --------------------
+
     def destroy_node(self):
-        """Clean shutdown of node and BLE connection."""
         self.get_logger().info("Shutting down CorsanoWrapper node...")
         try:
             if self.driver and self.driver.peripheral and self.driver.peripheral.is_connected():
@@ -257,6 +215,7 @@ def main(args=None):
         error("[CorsanoWrapper] External ROS 2 shutdown requested.")
     except Exception as e:
         error(f"[CorsanoWrapper] Unhandled exception: {type(e).__name__}: {e}")
+        traceback.print_exc()
     finally:
         if node is not None:
             node.destroy_node()
